@@ -1,7 +1,10 @@
-CDC *s_Terry=GRRead("Chars/Terry.CHAR.GR");
+
+CDC *s_Terry=GRRead("Chars/Terry.CHAR.GR");
+CDC *th_Dianna=GRRead("Chars/DiannaT.CHAR.GR");
 
 U0 FreeChars()
 {
+  DCDel(th_Dianna);
   DCDel(s_Terry);
 }
 
@@ -14,7 +17,7 @@ U0 GR96Blot(CDC *dc, I64 dc_x, I64 dc_y,
   switch(r)
   {
     case TRUE:
-      CSprite *s=DC2Sprite(GR96);
+      CSprite *s=DC2Sprite(GR96);
       Sprite3YB(dc, 72+dc_x, dc_y, 0, s, 179);
       Free(s);
       break;

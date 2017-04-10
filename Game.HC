@@ -1,6 +1,16 @@
 // Terrys Temple Quest
 
-#include "Chars";
+class GameState {
+  I64 scene_id;
+  I64 player_x;
+  I64 player_y;
+  I64 walkto_x;
+  I64 walkto_y;
+  I64 walk_fdir;
+  I64 walk_fseq;
+  I64 bgscroll_x;
+  I64 walk_dir;
+};
 
 class Scene {
   Scene *next;
@@ -14,6 +24,7 @@ class Scene {
   I64 st_ny[16];
   CDC *bg;
   CDC *mask;
+  U8 song[512];
 };
 
 Scene *SceneAdd(I64 init_x, I64 t_x, I64 t_y, U8 *loc, U8 *bg_file, Scene *sc_head)
@@ -32,6 +43,7 @@ Scene *SceneAdd(I64 init_x, I64 t_x, I64 t_y, U8 *loc, U8 *bg_file, Scene *sc_he
     scx++;
   };
   StrCpy(sc_new->loc,loc);
+  StrCpy(sc_new->song,"R");
   sc_new->bg=GRRead(bg_file);
   sc_new->mask=DCNew(sc_new->bg->width,sc_new->bg->height);
   DCFill(sc_new->mask,0);
@@ -70,168 +82,296 @@ U0 ScenesDel(Scene *_lst)
   Free(_lst);
 }
 
-U0 Run()
+U0 PlaySceneSong(U8 *song)
+{
+  while (TRUE)
+  {
+    Play(song);
+  };
+}
+
+U0 LoadGameState(GameState *gs, U8 *state_file)
+{
+  // Load game state from GAME.STATE.Z
+  I64 *state_load=FileRead(state_file);
+  gs->scene_id = state_load[0];
+  gs->player_x = state_load[1];
+  gs->player_y = state_load[2];
+  gs->walkto_x = state_load[3];
+  gs->walkto_y = state_load[4];
+  gs->walk_fdir = state_load[5];
+  gs->walk_fseq = state_load[6];
+  gs->bgscroll_x = state_load[7];
+  gs->walk_dir = state_load[8];
+  Free(state_load);
+}
+
+U0 SaveGameState(U8 *state_file, GameState *gs)
+{
+  // Save game state to GAME.STATE.Z
+  I64 *save_state=CAlloc(sizeof(GameState));
+  save_state[0]= gs->scene_id;
+  save_state[1]= gs->player_x;
+  save_state[2]= gs->player_y;
+  save_state[3]= gs->walkto_x;
+  save_state[4]= gs->walkto_y;
+  save_state[5]= gs->walk_fdir;
+  save_state[6]= gs->walk_fseq;
+  save_state[7]= gs->bgscroll_x;
+  save_state[8]= gs->walk_dir;
+  FileWrite(state_file,save_state,sizeof(GameState));
+  Free(save_state);
+}
+
+U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 {
   SettingsPush;
   WinBorder;
   WinMax;
-  CDC *dc=DCAlias();
-  I64 f=0;
-  I64 fd=0;
-  I64 hud_row=0;
-  I64 r=0;
-  I64 sc=0;
-  I64 tr=0;
 
-  I64 s_ctr=0;
-  I64 t_id=0;
-  I64 nx=320;
-  I64 ny=240;
-  I64 cx=nx;
-  I64 cy=ny;
-  I64 pb=0;
-  I64 px=0;
-  I64 py=0;
+  CDC *dc=DCAlias();
+  GameState *gs=CAlloc(sizeof(GameState));
+
+  if (load_state)
+  {
+    LoadGameState(gs,"GAME.STATE.Z");
+  }
+  else
+  {
+    gs->scene_id=0;
+    gs->player_x=320;
+    gs->player_y=240;
+    gs->walkto_x=gs->player_x;
+    gs->walkto_y=gs->player_y;
+    gs->walk_dir=0;
+  };
+
+  #define WALK_SPEED 2
+
   Bool bg_layer=TRUE;
 
-  I64 bnd_x1y1;
-  I64 bnd_x2y2;
-  I64 bx;
+  I64 bnd_x1y1=0;
+  I64 bnd_x2y2=0;
+  I64 hud_row=0;
   I64 msg_code;
+  I64 prev_bgx=0;
+  I64 prev_px=0;
+  I64 prev_py=0;
+  I64 prev_timer=0;
+  I64 scan_code=0;
+  I64 scene_ctr=0;
 
+  CTask *SongTask=0;
+  
   #include "Scenes";
 
-  bx=s_ptr->init_x;
+  U8 f_charset[0x7F];
 
-  while (sc!=1)
+  StrCpy(f_charset," !\"#$$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
+  GameFont *font_swash=LoadFont("Fonts/Swash.FONT.GR",12,9,52,83,19,f_charset);
+
+  //StrCpy(f_charset,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789   .,;:@#'!\"/?<>%&*{} $$");
+  //GameFont *font_uni=LoadFont("Fonts/Unispace.FONT.GR",13,9,21,23,10,f_charset);
+
+  StrCpy(f_charset,"ABCDEFGHIJKLMNOPQRSTUVWXYZ    abcdefghijklmnopqrstuvwxyz '  0123456789  $$ !?#%&()\"*@");
+  GameFont *font_berk=LoadFont("Fonts/Berkelium.FONT.GR",6,13,25,26,12,f_charset);
+
+  s_ptr=*scenes;
+  scene_ctr=0;
+  while(scene_ctr<gs->scene_id)
   {
-    sc=InU8(0x60);
+    s_ptr=s_ptr->next;
+    scene_ctr++;
+  };
+  if (SongTask) { Kill(SongTask); };
+  SongTask=Spawn(&PlaySceneSong,s_ptr->song);
 
-    if (sc==0x1C) { bg_layer=!bg_layer; };
+  if (!load_state)
+  {
+    gs->bgscroll_x=s_ptr->init_x;
+  };
+
+  while (scan_code!=1)
+  {
+    scan_code=InU8(0x60);
+
+
+    if (scan_code==0x26)
+    { 
+      LoadGameState(gs,"GAME.STATE.Z");
+      s_ptr=*scenes;
+      scene_ctr=0;
+      while(scene_ctr<gs->scene_id)
+      {
+        s_ptr=s_ptr->next;
+        scene_ctr++;
+      };
+      if (SongTask) { Kill(SongTask); };
+      SongTask=Spawn(&PlaySceneSong,s_ptr->song);
+    };
+
+    // Debug: ENTER=toggle bg_layer
+    if (scan_code==0x1C) { bg_layer=!bg_layer; };
+
+    if (scan_code==0x4B) { gs->walkto_x= gs->player_x-WALK_SPEED*2; };
+    if (scan_code==0x4D) { gs->walkto_x= gs->player_x+WALK_SPEED*2; };
+    if (scan_code==0x48) { gs->walkto_y= gs->player_y-WALK_SPEED*2; };
+    if (scan_code==0x50) { gs->walkto_y= gs->player_y+WALK_SPEED*2; };
 
     msg_code=ScanMsg(,,1<<MSG_MS_L_UP+1<<MSG_MS_R_UP);
     if (msg_code==MSG_MS_L_UP)
     {
-      cx=ms.pos.x-24;
-      cy=ms.pos.y-24;      
+      gs->walkto_x=(ms.pos.x-24)/WALK_SPEED*WALK_SPEED;
+      gs->walkto_y=(ms.pos.y-24)/WALK_SPEED*WALK_SPEED;      
     };
 
-    tr=SysTimerRead;    
+    prev_timer=SysTimerRead;    
 
     if (bg_layer)
     {
-      GrBlot(dc,bx,0,s_ptr->bg);
+      GrBlot(dc,gs->bgscroll_x,0,s_ptr->bg);
     }
     else
     {
-      GrBlot(dc,bx,0,s_ptr->mask);
+      GrBlot(dc,gs->bgscroll_x,0,s_ptr->mask);
       // Draw Walking BoundingBox
       dc->color=GREEN;
-      GrRect(dc,nx+16,ny+132,40,16);
+      GrRect(dc,gs->player_x+16,gs->player_y+132,40,16);
     };
   
     // HUD
     dc->color=BLUE;
-    GrRect(dc,24,24,96*2,96);
+    GrRect(dc,0,0,640,96);
+    FontText(dc,font_swash,"Terry's Temple Quest",220,-24,LTCYAN,BLACK);
+
+    FontText(dc,font_berk,"Walk To",224+8,48,YELLOW);
+    FontText(dc,font_berk,"Pick Up",224+8,70,WHITE);
+
+    FontText(dc,font_berk,"Talk To",332+8,48,WHITE);
+    FontText(dc,font_berk,"Inventory",332+8,70,WHITE);
+
+    FontText(dc,font_berk,"Open",464+8,48,WHITE);
+    FontText(dc,font_berk,"Close",464+8,70,WHITE);
+
+    FontText(dc,font_berk,"Push",548+8,48,WHITE);
+    FontText(dc,font_berk,"Pull",548+8,70,WHITE);
+
+
     dc->color=WHITE;
-    GrPrint(dc,24,24,"旼컴컴컴컴컴컴컴컴컴컴커");
+    GrPrint(dc,24,0,"旼컴컴컴컴컴컴컴컴컴컴커");
     hud_row=0;
     while (hud_row<10)
     {
-      GrPrint(dc,24,32+(8*hud_row),"�");
-      GrPrint(dc,208,32+(8*hud_row),"�");
+      GrPrint(dc,24,8+(8*hud_row),"�");
+      GrPrint(dc,208,8+(8*hud_row),"�");
       hud_row++;
     };
-    GrPrint(dc,24,112,"읕컴컴컴컴컴컴컴컴컴컴켸");
+    GrPrint(dc,24,88,"읕컴컴컴컴컴컴컴컴컴컴켸");
 
-    GrPrint(dc,30,32," Terry's Temple Quest");    
+    GrPrint(dc,30,8," Terry's Temple Quest");    
 
-    GrPrint(dc,24+(8*1),32+(8*4), "S");
-    GrPrint(dc,24+(8*1),32+(8*5), "h");
+    GrPrint(dc,24+(8*1),32+(8*1), "S");
+    GrPrint(dc,24+(8*1),32+(8*2), "h");
+    GrPrint(dc,24+(8*1),32+(8*3), "a");
+    GrPrint(dc,24+(8*1),32+(8*4), "s");
+    GrPrint(dc,24+(8*1),32+(8*5), "t");
     GrPrint(dc,24+(8*1),32+(8*6), "a");
-    GrPrint(dc,24+(8*1),32+(8*7), "s");
-    GrPrint(dc,24+(8*1),32+(8*8), "t");
-    GrPrint(dc,24+(8*1),32+(8*9), "a");
-    GR96Blot(dc,14,16,s_Terry,3,1,0);
+    GR96Blot(dc,14,-8,s_Terry,3,1,0);
 
     StrCpy(Fs->task_title,s_ptr->loc);
-    GrPrint(dc,24+(8*8),32+(8*9),s_ptr->loc);
+    GrPrint(dc,24+(8*8),32+(8*5),s_ptr->loc);
+
+    //Debug
+    GrPrint(dc,24+(8*6),32+(8*1),"ms.X1Y1: %d %d", -gs->bgscroll_x+ms.pos.x, ms.pos.y);
+
+    GrPrint(dc,24+(8*8),32+(8*2),"BX: %d", gs->bgscroll_x);
+    GrPrint(dc,24+(8*8),32+(8*3),"X1 Y1: %d %d", -gs->bgscroll_x+gs->player_x+16, gs->player_y+132);
+    GrPrint(dc,24+(8*8),32+(8*4),"X2 Y2: %d %d", -gs->bgscroll_x+gs->player_x+16+39, gs->player_y+132+15);
 
     // Terry 
-    //GrPrint(dc,24+(8*8),32+(8*6),"BX: %d", bx);
-    //GrPrint(dc,24+(8*8),32+(8*7),"X1 Y1: %d %d", -bx+nx+16, ny+132);
-    //GrPrint(dc,24+(8*8),32+(8*8),"X2 Y2: %d %d", -bx+nx+16+39, ny+132+15);
+    GR96Blot(dc,gs->player_x,gs->player_y+52,s_Terry,gs->walk_fseq,0,gs->walk_dir);
+    GR96Blot(dc,gs->player_x,gs->player_y,s_Terry,2,2,!gs->walk_dir);
 
-    GR96Blot(dc,nx,ny+52,s_Terry,f,0,r);
-    GR96Blot(dc,nx,ny,s_Terry,2,2,!r);
+    // Test Dianna Thumbnail Overlay
+    GrBlot(dc,0,360,th_Dianna);
 
-    bnd_x1y1 = GrPeek(s_ptr->mask, -bx+nx+16, ny+132);
-    bnd_x2y2 = GrPeek(s_ptr->mask, -bx+nx+16+39, ny+132+15);
+    bnd_x1y1 = GrPeek(s_ptr->mask, -gs->bgscroll_x+gs->player_x+16, gs->player_y+132);
+    bnd_x2y2 = GrPeek(s_ptr->mask, -gs->bgscroll_x+gs->player_x+16+39, gs->player_y+132+15);
 
-    while (SysTimerRead<tr+(30000)) { Sleep(1); };
+    while (SysTimerRead<prev_timer+(30000)) { Sleep(1); };
 
-    if (cx != nx || cy != ny)
+    if (gs->walkto_x != gs->player_x || gs->walkto_y != gs->player_y)
     {
 
       if (bnd_x1y1>0 && bnd_x2y2>0) 
       {
         if (bnd_x1y1>1 && bnd_x2y2>1)
         {
-          bx=s_ptr->st_bx[bnd_x1y1];
-          nx=s_ptr->st_nx[bnd_x1y1];
-          ny=s_ptr->st_ny[bnd_x1y1];
-          t_id=s_ptr->st_id[bnd_x1y1];
-          cx=nx;
-          cy=ny;
-          px=nx;
-          py=ny;
-          pb=bx;
+          gs->bgscroll_x=s_ptr->st_bx[bnd_x1y1];
+          gs->player_x=s_ptr->st_nx[bnd_x1y1];
+          gs->player_y=s_ptr->st_ny[bnd_x1y1];
+          gs->scene_id=s_ptr->st_id[bnd_x1y1];
+          gs->walkto_x=gs->player_x;
+          gs->walkto_y=gs->player_y;
+          prev_px=gs->player_x;
+          prev_py=gs->player_y;
+          prev_bgx=gs->bgscroll_x;
           s_ptr=*scenes;
-          s_ctr=0;
-          while(s_ctr<t_id)
+          scene_ctr=0;
+          while(scene_ctr<gs->scene_id)
           {
             s_ptr=s_ptr->next;
-            s_ctr++;
+            scene_ctr++;
           };
+          if (SongTask) { Kill(SongTask); };
+          SongTask=Spawn(&PlaySceneSong,s_ptr->song);
         }
         else
         {
-          px=nx;
-          py=ny;
-          pb=bx;
+          prev_px=gs->player_x;
+          prev_py=gs->player_y;
+          prev_bgx=gs->bgscroll_x;
 
-          if (cx < nx) { r=1; bx+=2; cx+=2; };
-          if (cx > nx) { r=0; bx-=2; cx-=2; };
+          if (gs->walkto_x < gs->player_x) { gs->walk_dir=1; gs->bgscroll_x+=2; gs->walkto_x+=2; };
+          if (gs->walkto_x > gs->player_x) { gs->walk_dir=0; gs->bgscroll_x-=2; gs->walkto_x-=2; };
 
-          if (bx>0) { bx=0; };
-          if (640-bx>s_ptr->bg->width) { bx= (640-s_ptr->bg->width); };
+          if (gs->bgscroll_x>0) { gs->bgscroll_x=0; };
+          if (640-gs->bgscroll_x>s_ptr->bg->width) { gs->bgscroll_x= (640-s_ptr->bg->width); };
 
-          if (cx < nx) { nx--; };
-          if (cx > nx) { nx++; };
-          if (cy < ny) { ny--; };
-          if (cy > ny) { ny++; };
+          if (gs->walkto_x < gs->player_x) { gs->player_x -= WALK_SPEED; };
+          if (gs->walkto_x > gs->player_x) { gs->player_x += WALK_SPEED; };
+          if (gs->walkto_y < gs->player_y) { gs->player_y -= WALK_SPEED; };
+          if (gs->walkto_y > gs->player_y) { gs->player_y += WALK_SPEED; };
 
-          if (fd==0) { f++; };
-          if (fd==1) { f--; };
+          if (gs->walk_fdir==0) { gs->walk_fseq++; };
+          if (gs->walk_fdir==1) { gs->walk_fseq--; };
         };
       } 
       else {
-        nx=px;
-        ny=py;
-        bx=pb;
+        gs->player_x=prev_px;
+        gs->player_y=prev_py;
+        gs->bgscroll_x=prev_bgx;
  
-        cx=nx;
-        cy=ny;  
+        gs->walkto_x=gs->player_x;
+        gs->walkto_y=gs->player_y;  
       };
     };
 
-    if (f>3) { fd=1; };
-    if (f<1) { fd=0; };    
+    if (gs->walk_fseq>3) { gs->walk_fdir=1; };
+    if (gs->walk_fseq<1) { gs->walk_fdir=0; };    
 
   };
 
+  if (SongTask) { Kill(SongTask); };
+
+  SaveGameState("GAME.STATE.Z",gs);
+  Free(gs);
+
   ScenesDel(scenes);
   DCFill(dc,TRANSPARENT);
+  // FreeFonts;
+  FreeFont(font_berk);
+  FreeFont(font_swash);
   FreeChars;
   DCDel(dc);
   SettingsPop;
