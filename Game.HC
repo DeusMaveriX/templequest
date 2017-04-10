@@ -27,6 +27,8 @@ class Scene {
   U8 song[512];
 };
 
+CDC *dc=DCNew(640,480);
+
 Scene *SceneAdd(I64 init_x, I64 t_x, I64 t_y, U8 *loc, U8 *bg_file, Scene *sc_head)
 {
   I64 scx=0;
@@ -123,13 +125,21 @@ U0 SaveGameState(U8 *state_file, GameState *gs)
   Free(save_state);
 }
 
+U0 DrawIt(CTask *task,CDC *tdc)
+{
+  task=task; //Suppress unused var warning
+  GrBlot(tdc,0,0,dc);
+}
+
 U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 {
+  sfx_cpu=sfx_cpu; // Suppress unused var warning
   SettingsPush;
+  U8 *doc=DocSave(DocPut);
+  DocClear;
   WinBorder;
   WinMax;
 
-  CDC *dc=DCAlias();
   GameState *gs=CAlloc(sizeof(GameState));
 
   if (load_state)
@@ -160,6 +170,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   I64 prev_timer=0;
   I64 scan_code=0;
   I64 scene_ctr=0;
+  I64 snd_toggle=TRUE;
 
   CTask *SongTask=0;
   
@@ -169,9 +180,6 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 
   StrCpy(f_charset," !\"#$$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
   GameFont *font_swash=LoadFont("Fonts/Swash.FONT.GR",12,9,52,83,19,f_charset);
-
-  //StrCpy(f_charset,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789   .,;:@#'!\"/?<>%&*{} $$");
-  //GameFont *font_uni=LoadFont("Fonts/Unispace.FONT.GR",13,9,21,23,10,f_charset);
 
   StrCpy(f_charset,"ABCDEFGHIJKLMNOPQRSTUVWXYZ    abcdefghijklmnopqrstuvwxyz '  0123456789  $$ !?#%&()\"*@");
   GameFont *font_berk=LoadFont("Fonts/Berkelium.FONT.GR",6,13,25,26,12,f_charset);
@@ -184,12 +192,15 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     scene_ctr++;
   };
   if (SongTask) { Kill(SongTask); };
-  SongTask=Spawn(&PlaySceneSong,s_ptr->song);
+  SndRst;
+  if (snd_toggle) { SongTask=Spawn(&PlaySceneSong,s_ptr->song); }
 
   if (!load_state)
   {
     gs->bgscroll_x=s_ptr->init_x;
   };
+
+  Fs->draw_it=&DrawIt;
 
   while (scan_code!=1)
   {
@@ -207,12 +218,24 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
         scene_ctr++;
       };
       if (SongTask) { Kill(SongTask); };
-      SongTask=Spawn(&PlaySceneSong,s_ptr->song);
+      SndRst;
+      if (snd_toggle) { SongTask=Spawn(&PlaySceneSong,s_ptr->song); }
     };
 
     // Debug: ENTER=toggle bg_layer
-    if (scan_code==0x1C) { bg_layer=!bg_layer; };
+    if (scan_code==0x23) { bg_layer=!bg_layer; };
 
+
+    // Toggle music and sound effects
+    if (scan_code==0x32)
+    { 
+      snd_toggle=!snd_toggle;
+      if (SongTask) { Kill(SongTask); };
+      SndRst;
+      if (snd_toggle) { SongTask=Spawn(&PlaySceneSong,s_ptr->song); }
+    };
+
+    // Arrow keys move player
     if (scan_code==0x4B) { gs->walkto_x= gs->player_x-WALK_SPEED*2; };
     if (scan_code==0x4D) { gs->walkto_x= gs->player_x+WALK_SPEED*2; };
     if (scan_code==0x48) { gs->walkto_y= gs->player_y-WALK_SPEED*2; };
@@ -248,7 +271,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     FontText(dc,font_berk,"Pick Up",224+8,70,WHITE);
 
     FontText(dc,font_berk,"Talk To",332+8,48,WHITE);
-    FontText(dc,font_berk,"Inventory",332+8,70,WHITE);
+    FontText(dc,font_berk,"Inventory",332+8,70,WHITE);
 
     FontText(dc,font_berk,"Open",464+8,48,WHITE);
     FontText(dc,font_berk,"Close",464+8,70,WHITE);
@@ -298,8 +321,6 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     bnd_x1y1 = GrPeek(s_ptr->mask, -gs->bgscroll_x+gs->player_x+16, gs->player_y+132);
     bnd_x2y2 = GrPeek(s_ptr->mask, -gs->bgscroll_x+gs->player_x+16+39, gs->player_y+132+15);
 
-    while (SysTimerRead<prev_timer+(30000)) { Sleep(1); };
-
     if (gs->walkto_x != gs->player_x || gs->walkto_y != gs->player_y)
     {
 
@@ -324,7 +345,8 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
             scene_ctr++;
           };
           if (SongTask) { Kill(SongTask); };
-          SongTask=Spawn(&PlaySceneSong,s_ptr->song);
+          SndRst;
+          if (snd_toggle) { SongTask=Spawn(&PlaySceneSong,s_ptr->song); }
         }
         else
         {
@@ -360,19 +382,22 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     if (gs->walk_fseq>3) { gs->walk_fdir=1; };
     if (gs->walk_fseq<1) { gs->walk_fdir=0; };    
 
+    while (SysTimerRead<prev_timer+(30000)) { Sleep(1); };
   };
 
   if (SongTask) { Kill(SongTask); };
+  SndRst;
 
   SaveGameState("GAME.STATE.Z",gs);
   Free(gs);
 
   ScenesDel(scenes);
-  DCFill(dc,TRANSPARENT);
-  // FreeFonts;
+  Fs->draw_it=0;
   FreeFont(font_berk);
   FreeFont(font_swash);
   FreeChars;
   DCDel(dc);
+  DocLoad(DocPut,doc,sizeof(doc));
+  Free(doc);
   SettingsPop;
 }
