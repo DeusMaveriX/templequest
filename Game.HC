@@ -1,5 +1,13 @@
 // Terrys Temple Quest
 
+// scene_objects
+//   unique_id (if 0, next free)
+//   scene_id (if -1, inventory)
+//   obj_x
+//   obj_y
+
+#define S_MAX_OBJ 512
+
 class GameState {
   I64 scene_id;
   I64 player_x;
@@ -10,6 +18,10 @@ class GameState {
   I64 walk_fseq;
   I64 bgscroll_x;
   I64 walk_dir;
+  I64 s_obj_uid[S_MAX_OBJ];
+  I64 s_obj_sid[S_MAX_OBJ];
+  I64 s_obj_x[S_MAX_OBJ];
+  I64 s_obj_y[S_MAX_OBJ];
 };
 
 class Scene {
@@ -96,6 +108,8 @@ U0 LoadGameState(GameState *gs, U8 *state_file)
 {
   // Load game state from GAME.STATE.Z
   I64 *state_load=FileRead(state_file);
+  I64 so_ctr=0;
+  I64 so_idx=9;
   gs->scene_id = state_load[0];
   gs->player_x = state_load[1];
   gs->player_y = state_load[2];
@@ -105,6 +119,18 @@ U0 LoadGameState(GameState *gs, U8 *state_file)
   gs->walk_fseq = state_load[6];
   gs->bgscroll_x = state_load[7];
   gs->walk_dir = state_load[8];
+  while (so_ctr<S_MAX_OBJ)
+  {
+    gs->s_obj_uid[so_ctr] = state_load[so_idx];
+    so_idx++; 
+    gs->s_obj_sid[so_ctr] = state_load[so_idx];
+    so_idx++; 
+    gs->s_obj_x[so_ctr] = state_load[so_idx];
+    so_idx++; 
+    gs->s_obj_y[so_ctr] = state_load[so_idx];
+    so_idx++; 
+    so_ctr++;
+  };
   Free(state_load);
 }
 
@@ -112,6 +138,8 @@ U0 SaveGameState(U8 *state_file, GameState *gs)
 {
   // Save game state to GAME.STATE.Z
   I64 *save_state=CAlloc(sizeof(GameState));
+  I64 so_ctr=0;
+  I64 so_idx=9;
   save_state[0]= gs->scene_id;
   save_state[1]= gs->player_x;
   save_state[2]= gs->player_y;
@@ -121,6 +149,18 @@ U0 SaveGameState(U8 *state_file, GameState *gs)
   save_state[6]= gs->walk_fseq;
   save_state[7]= gs->bgscroll_x;
   save_state[8]= gs->walk_dir;
+  while (so_ctr<S_MAX_OBJ)
+  {
+    save_state[so_idx]= gs->s_obj_uid[so_ctr];
+    so_idx++; 
+    save_state[so_idx]= gs->s_obj_sid[so_ctr];
+    so_idx++; 
+    save_state[so_idx]= gs->s_obj_x[so_ctr];
+    so_idx++; 
+    save_state[so_idx]= gs->s_obj_y[so_ctr];
+    so_idx++; 
+    so_ctr++;
+  };
   FileWrite(state_file,save_state,sizeof(GameState));
   Free(save_state);
 }
@@ -139,6 +179,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   DocClear;
   WinBorder;
   WinMax;
+  I64 so_ctr=0;
 
   GameState *gs=CAlloc(sizeof(GameState));
 
@@ -154,6 +195,15 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     gs->walkto_x=gs->player_x;
     gs->walkto_y=gs->player_y;
     gs->walk_dir=0;
+    so_ctr=0;
+    while (so_ctr<S_MAX_OBJ)
+    {
+      gs->s_obj_uid[so_ctr]=0;
+      gs->s_obj_sid[so_ctr]=0;
+      gs->s_obj_x[so_ctr]=0;
+      gs->s_obj_y[so_ctr]=0;
+      so_ctr++;
+    };
   };
 
   #define ACT_WALK_TO	0x10
@@ -253,7 +303,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     if (scan_code==0x50) { gs->walkto_y= gs->player_y+WALK_SPEED*2; };
 
     msg_code=ScanMsg(,,1<<MSG_MS_L_UP+1<<MSG_MS_R_UP);
-    if (msg_code==MSG_MS_L_UP)
+    if (msg_code==MSG_MS_L_UP)
     {
       if (ms.pos.y>103)
       {
