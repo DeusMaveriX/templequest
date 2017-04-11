@@ -133,7 +133,7 @@ U0 DrawIt(CTask *task,CDC *tdc)
 
 U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 {
-  sfx_cpu=sfx_cpu; // Suppress unused var warning
+  sfx_cpu=sfx_cpu; // Suppress unused var warning
   SettingsPush;
   U8 *doc=DocSave(DocPut);
   DocClear;
@@ -156,13 +156,24 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     gs->walk_dir=0;
   };
 
+  #define ACT_WALK_TO	0x10
+  #define ACT_PICK_UP	0x11
+  #define ACT_TALK_TO	0x12
+  #define ACT_INVENTORY	0x13
+  #define ACT_OPEN	0x14
+  #define ACT_CLOSE	0x15
+  #define ACT_PUSH	0x16
+  #define ACT_PULL	0x17
+
   #define WALK_SPEED 2
 
   Bool bg_layer=TRUE;
 
   I64 bnd_x1y1=0;
   I64 bnd_x2y2=0;
+  I64 h_tc=0;
   I64 hud_row=0;
+  I64 left_action=ACT_WALK_TO;
   I64 msg_code;
   I64 prev_bgx=0;
   I64 prev_px=0;
@@ -242,10 +253,57 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     if (scan_code==0x50) { gs->walkto_y= gs->player_y+WALK_SPEED*2; };
 
     msg_code=ScanMsg(,,1<<MSG_MS_L_UP+1<<MSG_MS_R_UP);
-    if (msg_code==MSG_MS_L_UP)
+    if (msg_code==MSG_MS_L_UP)
     {
-      gs->walkto_x=(ms.pos.x-24)/WALK_SPEED*WALK_SPEED;
-      gs->walkto_y=(ms.pos.y-24)/WALK_SPEED*WALK_SPEED;      
+      if (ms.pos.y>103)
+      {
+        if (left_action==ACT_WALK_TO)
+        { 
+          gs->walkto_x=(ms.pos.x-24)/WALK_SPEED*WALK_SPEED;
+          gs->walkto_y=(ms.pos.y-24)/WALK_SPEED*WALK_SPEED;      
+        };
+      }
+      else
+      {
+        if (ms.pos.y>57 && ms.pos.y<71)
+        {
+          if (ms.pos.x>237 && ms.pos.x<321)
+          {
+            left_action=ACT_WALK_TO;
+          };
+          if (ms.pos.x>346 && ms.pos.x<431)
+          {
+            left_action=ACT_TALK_TO;
+          };
+          if (ms.pos.x>479 && ms.pos.x<526)
+          {
+            left_action=ACT_OPEN;
+          };
+          if (ms.pos.x>563 && ms.pos.x<611)
+          {
+            left_action=ACT_PUSH;
+          };
+        };
+        if (ms.pos.y>80 && ms.pos.y<95)
+        {
+          if (ms.pos.x>238 && ms.pos.x<321)
+          {
+            left_action=ACT_PICK_UP;
+          };
+          if (ms.pos.x>347 && ms.pos.x<454)
+          {
+            left_action=ACT_INVENTORY;
+          };
+          if (ms.pos.x>480 && ms.pos.x<538)
+          {
+            left_action=ACT_CLOSE;
+          };
+          if (ms.pos.x>561 && ms.pos.x<606)
+          {
+            left_action=ACT_PULL;
+          };
+        };
+      }
     };
 
     prev_timer=SysTimerRead;    
@@ -267,18 +325,143 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     GrRect(dc,0,0,640,96);
     FontText(dc,font_swash,"Terry's Temple Quest",220,-24,LTCYAN,BLACK);
 
-    FontText(dc,font_berk,"Walk To",224+8,48,YELLOW);
-    FontText(dc,font_berk,"Pick Up",224+8,70,WHITE);
+    if (left_action==ACT_WALK_TO)
+    {
+      h_tc=YELLOW;
+    }
+    else
+    {
+      h_tc=WHITE;
+      if (ms.pos.y>57 && ms.pos.y<71)
+      {
+        if (ms.pos.x>237 && ms.pos.x<321)
+        {
+          h_tc=LTGREEN;
+        };
+      };
+    };
+    FontText(dc,font_berk,"Walk To",224+8,48,h_tc);
 
-    FontText(dc,font_berk,"Talk To",332+8,48,WHITE);
-    FontText(dc,font_berk,"Inventory",332+8,70,WHITE);
+    if (left_action==ACT_PICK_UP)
+    {
+      h_tc=YELLOW;
+    }
+    else
+    {
+      h_tc=WHITE;
+      if (ms.pos.y>80 && ms.pos.y<95)
+      {
+        if (ms.pos.x>238 && ms.pos.x<321)
+        {
+          h_tc=LTGREEN;
+        };
+      };
+    };
+    FontText(dc,font_berk,"Pick Up",224+8,70,h_tc);
 
-    FontText(dc,font_berk,"Open",464+8,48,WHITE);
-    FontText(dc,font_berk,"Close",464+8,70,WHITE);
+    if (left_action==ACT_TALK_TO)
+    {
+      h_tc=YELLOW;
+    }
+    else
+    {
+      h_tc=WHITE;
+      if (ms.pos.y>57 && ms.pos.y<71)
+      {
+        if (ms.pos.x>346 && ms.pos.x<431)
+        {
+          h_tc=LTGREEN;
+        };
+      };
+    };
+    FontText(dc,font_berk,"Talk To",332+8,48,h_tc);
 
-    FontText(dc,font_berk,"Push",548+8,48,WHITE);
-    FontText(dc,font_berk,"Pull",548+8,70,WHITE);
 
+    if (left_action==ACT_INVENTORY)
+    {
+      h_tc=YELLOW;
+    }
+    else
+    {
+      h_tc=WHITE;
+      if (ms.pos.y>80 && ms.pos.y<95)
+      {
+        if (ms.pos.x>347 && ms.pos.x<454)
+        {
+          h_tc=LTGREEN;
+        };
+      };
+    };
+    FontText(dc,font_berk,"Inventory",332+8,70,h_tc);
+
+
+    if (left_action==ACT_OPEN)
+    {
+      h_tc=YELLOW;
+    }
+    else
+    {
+      h_tc=WHITE;
+      if (ms.pos.y>57 && ms.pos.y<71)
+      {
+        if (ms.pos.x>479 && ms.pos.x<526)
+        {
+          h_tc=LTGREEN;
+        };
+      };
+    };
+    FontText(dc,font_berk,"Open",464+8,48,h_tc);
+
+    if (left_action==ACT_CLOSE)
+    {
+      h_tc=YELLOW;
+    }
+    else
+    {
+      h_tc=WHITE;
+      if (ms.pos.y>80 && ms.pos.y<95)
+      {
+        if (ms.pos.x>480 && ms.pos.x<538)
+        {
+          h_tc=LTGREEN;
+        };
+      };
+    };
+    FontText(dc,font_berk,"Close",464+8,70,h_tc);
+
+    if (left_action==ACT_PUSH)
+    {
+      h_tc=YELLOW;
+    }
+    else
+    {
+      h_tc=WHITE;
+      if (ms.pos.y>57 && ms.pos.y<71)
+      {
+        if (ms.pos.x>563 && ms.pos.x<611)
+        {
+          h_tc=LTGREEN;
+        };
+      };
+    };
+    FontText(dc,font_berk,"Push",548+8,48,h_tc);
+
+    if (left_action==ACT_PULL)
+    {
+      h_tc=YELLOW;
+    }
+    else
+    {
+      h_tc=WHITE;
+      if (ms.pos.y>80 && ms.pos.y<95)
+      {
+        if (ms.pos.x>561 && ms.pos.x<606)
+        {
+          h_tc=LTGREEN;
+        };
+      };
+    };
+    FontText(dc,font_berk,"Pull",548+8,70,h_tc);
 
     dc->color=WHITE;
     GrPrint(dc,24,0,"旼컴컴컴컴컴컴컴컴컴컴커");
