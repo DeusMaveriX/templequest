@@ -1,7 +1,7 @@
 /*
   Scenes are defined here.
   A Scene is a backdrop with a mask.
-  Mask contains rects,
+  Mask contains rects,
     Bounds clipped at color < 1
     color == 1 : Terry can walk here
     color > 1  : scene transition
@@ -55,7 +55,7 @@ m_ptr->st_ny[3]=270;
 
 // 02
 //m_ptr=SceneAdd(0, 0, 300, "Vegas Blvd", "Scenes/02.SCENE.GR", scenes);
-m_ptr=SceneAdd(0, 0, 300, "Grn Vly Groc", "Scenes/05.SCENE.GR", scenes);
+m_ptr=SceneAdd(0, 0, 300, "Green Valley Grocery", "Scenes/05.SCENE.GR", scenes);
 
 StrCpy(m_ptr->song, "6M6/8qGetF5GBe.Bs6Cq5BAetG6C5B6M6/8qGetF5GBe.Bs6Cq5BAetG6C5B6eGGCCet5BGAe6GDqDs5B6D5B6DqGsCFCF6eGGCCet5BGAe6GDqDs5B6D5B6DqGsCFCF");
 
@@ -71,7 +71,7 @@ GrFloodFill(m_ptr->mask,1123,332,TRUE);
 m_ptr->mask->color=2;
 GrRect(m_ptr->mask,881,331,80,32);
 
-//GrLine(m_ptr->mask,1143,312,1143,450);
+//GrLine(m_ptr->mask,1143,312,1143,450);
 //GrRect(m_ptr->mask,960,430,240,96);
 //m_ptr->mask->color=3;
 //GrRect(m_ptr->mask,1164,416,76,48);

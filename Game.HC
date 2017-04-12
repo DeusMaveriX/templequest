@@ -6,6 +6,7 @@
 //   obj_x
 //   obj_y
 
+#define I_MAX_ITEMS 16
 #define S_MAX_OBJ   512
 #define SO_MAX_DESC 32
 
@@ -30,7 +31,7 @@ class Scene {
   I64 init_x;
   I64 t_x;
   I64 t_y;
-  U8 loc[24];
+  U8 loc[32];
   I64 st_id[16];
   I64 st_bx[16];
   I64 st_nx[16];
@@ -172,6 +173,155 @@ U0 DrawIt(CTask *task,CDC *tdc)
   GrBlot(tdc,0,0,dc);
 }
 
+U0 InventoryView(CDC *dc, GameState *gs, GameFont *font_berk, U8 *so_desc, I64 *so_col, I64 *so_row)
+{
+
+  #define INV_DROP	0x10
+  #define INV_USE	0x11
+
+  Bool i_exit=FALSE;
+  I64 i_act=INV_DROP;
+  I64 i_ctr=0;
+  I64 i_item_x=0;
+  I64 i_item_y=0;
+  I64 i_tc=0;
+  I64 ms_sel_x=0;
+  I64 ms_sel_y=0;
+  I64 msg_code=0;
+  I64 scan_code=0;
+  U8 i_desc[SO_MAX_DESC];
+
+  while (!i_exit&&scan_code!=1&&msg_code!=MSG_MS_R_UP)
+  {
+    // Polling IN 0x60 screws up mouse msg handling?.. will fix
+    //scan_code=InU8(0x60);
+    msg_code=ScanMsg(,,1<<MSG_MS_L_UP+1<<MSG_MS_R_UP);
+
+    dc->color=BLUE;
+    GrRect(dc,0,96,640,272);
+
+    dc->color=WHITE;
+    GrLine(dc,0,96,0,368);
+    GrLine(dc,639,96,639,368);
+
+    GrLine(dc,0,96,639,96);
+    GrLine(dc,0,368,639,368);
+    
+    FontText(dc,font_berk,"Inventory",12,108,LTCYAN);
+
+    if (i_act==INV_DROP)
+    {
+      i_tc=YELLOW;
+    }
+    else
+    {
+      i_tc=WHITE;
+      if (ms.pos.y>132 && ms.pos.y<154)
+      {
+        if (ms.pos.x>12 && ms.pos.x<68)
+        {
+          if (msg_code==MSG_MS_L_UP)
+          {
+            i_act=INV_DROP;
+            i_tc=YELLOW;
+          }
+          else
+          {
+            i_tc=LTGREEN;
+          };
+        };
+      };
+    };
+    FontText(dc,font_berk,"Drop",12,132,i_tc);
+
+    if (i_act==INV_USE)
+    {
+      i_tc=YELLOW;
+    }
+    else
+    {
+      i_tc=WHITE;
+      if (ms.pos.y>156 && ms.pos.y<178)
+      {
+        if (ms.pos.x>12 && ms.pos.x<55)
+        {
+          if (msg_code==MSG_MS_L_UP)
+          {
+            i_act=INV_USE;
+            i_tc=YELLOW;
+          }
+          else
+          {
+            i_tc=LTGREEN;
+          };
+        };
+      };
+    };
+    FontText(dc,font_berk,"Use",12,156,i_tc);
+
+    FontText(dc,font_berk,"Right click",12,300,LTGRAY);
+    FontText(dc,font_berk,"to close",12,324,LTGRAY);
+
+    i_ctr=0;
+    i_item_x=0;
+    i_item_y=0;
+    while (i_ctr<S_MAX_OBJ)
+    {
+      i_desc[0]=0;
+      if (gs->s_obj_uid[i_ctr]>0 && gs->s_obj_sid[i_ctr]==-1)
+      {
+        StrCpy(i_desc,so_desc+(gs->s_obj_uid[i_ctr]*SO_MAX_DESC));
+
+        dc->color=WHITE;
+        GrPrint(dc,192+(224*i_item_x),136+(64*i_item_y),i_desc);
+        SceneObjBlot(dc,144+(224*i_item_x),104+(64*i_item_y),so_col[gs->s_obj_uid[i_ctr]],so_row[gs->s_obj_uid[i_ctr]]);
+
+        if (ms.pos.y> 104+(64*i_item_y) && ms.pos.y<104+(64*i_item_y)+64)
+        {
+          if (ms.pos.x>144+(224*i_item_x) && ms.pos.x<144+(224*i_item_x)+224)
+          {
+            ms_sel_y=104+(64*i_item_y);
+            while (ms_sel_y<104+(64*i_item_y)+64)
+            {
+              ms_sel_x=144+(224*i_item_x);
+              while (ms_sel_x<144+(224*i_item_x)+224)
+              {
+                if (GrPeek(dc,ms_sel_x,ms_sel_y)!=BLUE)
+                {
+                  if (msg_code==MSG_MS_L_UP)
+                  {
+                    if (i_act==INV_DROP)
+                    {
+                      gs->s_obj_sid[i_ctr]=gs->scene_id;
+                      gs->s_obj_x[i_ctr]=-gs->bgscroll_x+gs->player_x;
+                      gs->s_obj_y[i_ctr]=gs->player_y+96;
+                      i_exit=TRUE;
+                    };
+                  };
+                  dc->color=YELLOW;
+                  GrPrint(dc,192+(224*i_item_x),136+(64*i_item_y),i_desc);
+                  break;
+                };
+                ms_sel_x++;
+              };
+              ms_sel_y++;
+            };
+          };
+        };
+
+
+        i_item_x++;
+        if (i_item_x>1) { i_item_x=0; i_item_y++; };
+      };
+ 
+      i_ctr++;
+    };
+
+
+    Sleep(1);
+  };
+}
+
 U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 {
   sfx_cpu=sfx_cpu; // Suppress unused var warning
@@ -232,7 +382,6 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     gs->s_obj_x[8]=1032;
     gs->s_obj_y[8]=210;
 
-
   };
 
   #define ACT_WALK_TO	0x10
@@ -253,7 +402,6 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   I64 get_obj=FALSE;
   I64 get_oid=-1;
   I64 h_tc=0;
-  I64 hud_row=0;
   I64 left_action=ACT_WALK_TO;
   I64 msg_code;
   I64 prev_bgx=0;
@@ -389,7 +537,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
                       get_oid=so_ctr;
                     }
                     else { gs->s_obj_sid[so_ctr]=-1; };
-                  };
+                  };
                 };
               };
             };
@@ -625,29 +773,29 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     };
     FontText(dc,font_berk,"Pull",548+8,70,h_tc);
 
+    dc->color=YELLOW;
+    GrPrint(dc,8,16+(8*8),i_desc);    
+
     dc->color=WHITE;
-    GrPrint(dc,24,0,"旼컴컴컴컴컴컴컴컴컴컴커");
-    hud_row=0;
-    while (hud_row<10)
-    {
-      GrPrint(dc,24,8+(8*hud_row),"�");
-      GrPrint(dc,208,8+(8*hud_row),"�");
-      hud_row++;
-    };
-    GrPrint(dc,24,88,"읕컴컴컴컴컴컴컴컴컴컴켸");
-
-    GrPrint(dc,30,8,i_desc);    
-
-    GrPrint(dc,24+(8*1),32+(8*1), "S");
-    GrPrint(dc,24+(8*1),32+(8*2), "h");
-    GrPrint(dc,24+(8*1),32+(8*3), "a");
-    GrPrint(dc,24+(8*1),32+(8*4), "s");
-    GrPrint(dc,24+(8*1),32+(8*5), "t");
-    GrPrint(dc,24+(8*1),32+(8*6), "a");
-    GR96Blot(dc,14,-8,s_Terry,3,1,0);
+    GrPrint(dc,8,16+(8*1), "S");
+    GrPrint(dc,8,16+(8*2), "h");
+    GrPrint(dc,8,16+(8*3), "a");
+    GrPrint(dc,8,16+(8*4), "s");
+    GrPrint(dc,8,16+(8*5), "t");
+    GrPrint(dc,8,16+(8*6), "a");
+    GR96Blot(dc,-8,-24,s_Terry,3,1,0);
 
     StrCpy(Fs->task_title,s_ptr->loc);
-    GrPrint(dc,24+(8*8),32+(8*5),s_ptr->loc);
+    dc->color=LTCYAN;
+    GrPrint(dc,8,8,s_ptr->loc);
+    dc->color=WHITE;
+
+    GrLine(dc,0,0,0,96);
+    GrLine(dc,639,0,639,96);
+
+    GrLine(dc,0,0,639,0);
+    GrLine(dc,0,96,639,96);
+
 
     //Debug
     GrPrint(dc,24+(8*6),32+(8*1),"ms.X1Y1: %d %d", -gs->bgscroll_x+ms.pos.x, ms.pos.y);
@@ -737,6 +885,12 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
         };
         if (get_obj) { gs->s_obj_sid[get_oid]=-1; get_oid=-1; };
       };
+    };
+
+    if (left_action==ACT_INVENTORY)
+    {
+      InventoryView(dc,gs,font_berk,so_desc,so_col,so_row);
+      left_action=ACT_WALK_TO;
     };
 
     if (gs->walk_fseq>3) { gs->walk_fdir=1; };
