@@ -6,7 +6,8 @@
 //   obj_x
 //   obj_y
 
-#define S_MAX_OBJ 512
+#define S_MAX_OBJ   512
+#define SO_MAX_DESC 32
 
 class GameState {
   I64 scene_id;
@@ -179,6 +180,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   DocClear;
   WinBorder;
   WinMax;
+  U8 i_desc[SO_MAX_DESC];
   I64 so_ctr=0;
 
   GameState *gs=CAlloc(sizeof(GameState));
@@ -199,11 +201,38 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     while (so_ctr<S_MAX_OBJ)
     {
       gs->s_obj_uid[so_ctr]=0;
-      gs->s_obj_sid[so_ctr]=0;
+      gs->s_obj_sid[so_ctr]=0;
       gs->s_obj_x[so_ctr]=0;
       gs->s_obj_y[so_ctr]=0;
       so_ctr++;
     };
+
+    // Test placement Scene Object (Gold key)
+    gs->s_obj_uid[2]=4;
+    gs->s_obj_sid[2]=0;
+    gs->s_obj_x[2]=311;
+    gs->s_obj_y[2]=412;
+
+
+    // Test placement Scene Object (Shasta bottle)
+    gs->s_obj_uid[5]=1;
+    gs->s_obj_sid[5]=2;
+    gs->s_obj_x[5]=1240;
+    gs->s_obj_y[5]=310;
+
+    // Test placement Scene Object (Beefaroni)
+    gs->s_obj_uid[7]=2;
+    gs->s_obj_sid[7]=2;
+    gs->s_obj_x[7]=902;
+    gs->s_obj_y[7]=370;
+
+    // Test placement Scene Object (Plate of Nuggies)
+    gs->s_obj_uid[8]=5;
+    gs->s_obj_sid[8]=2;
+    gs->s_obj_x[8]=1032;
+    gs->s_obj_y[8]=210;
+
+
   };
 
   #define ACT_WALK_TO	0x10
@@ -221,6 +250,8 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 
   I64 bnd_x1y1=0;
   I64 bnd_x2y2=0;
+  I64 get_obj=FALSE;
+  I64 get_oid=-1;
   I64 h_tc=0;
   I64 hud_row=0;
   I64 left_action=ACT_WALK_TO;
@@ -237,6 +268,19 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   
   #include "Scenes";
 
+  I64 *so_col=CAlloc(sizeof(I64)*S_MAX_OBJ);
+  I64 *so_row=CAlloc(sizeof(I64)*S_MAX_OBJ);
+  U8 *so_desc=CAlloc(SO_MAX_DESC*S_MAX_OBJ);
+  so_ctr=0;
+  while (so_ctr<S_MAX_OBJ)
+  {
+    so_col[so_ctr]=0;
+    so_row[so_ctr]=0;
+    so_ctr++;
+  };
+
+  #include "SceneObjects"
+    
   U8 f_charset[0x7F];
 
   StrCpy(f_charset," !\"#$$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
@@ -297,10 +341,10 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     };
 
     // Arrow keys move player
-    if (scan_code==0x4B) { gs->walkto_x= gs->player_x-WALK_SPEED*2; };
-    if (scan_code==0x4D) { gs->walkto_x= gs->player_x+WALK_SPEED*2; };
-    if (scan_code==0x48) { gs->walkto_y= gs->player_y-WALK_SPEED*2; };
-    if (scan_code==0x50) { gs->walkto_y= gs->player_y+WALK_SPEED*2; };
+    if (scan_code==0x4B) { get_oid=-1; gs->walkto_x= gs->player_x-WALK_SPEED*2; };
+    if (scan_code==0x4D) { get_oid=-1; gs->walkto_x= gs->player_x+WALK_SPEED*2; };
+    if (scan_code==0x48) { get_oid=-1; gs->walkto_y= gs->player_y-WALK_SPEED*2; };
+    if (scan_code==0x50) { get_oid=-1; gs->walkto_y= gs->player_y+WALK_SPEED*2; };
 
     msg_code=ScanMsg(,,1<<MSG_MS_L_UP+1<<MSG_MS_R_UP);
     if (msg_code==MSG_MS_L_UP)
@@ -312,6 +356,48 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
           gs->walkto_x=(ms.pos.x-24)/WALK_SPEED*WALK_SPEED;
           gs->walkto_y=(ms.pos.y-24)/WALK_SPEED*WALK_SPEED;      
         };
+
+
+        if (left_action==ACT_PICK_UP)
+        {
+
+          so_ctr=0;
+          while (so_ctr<S_MAX_OBJ)
+          {
+            if (gs->s_obj_uid[so_ctr]>0)
+            {
+              if (gs->s_obj_sid[so_ctr]==gs->scene_id)
+              {
+                if (ms.pos.y>gs->s_obj_y[so_ctr] && ms.pos.y<(gs->s_obj_y[so_ctr]+48))
+                {
+                  if ((-gs->bgscroll_x+ms.pos.x)>gs->s_obj_x[so_ctr] && (-gs->bgscroll_x+ms.pos.x)<gs->s_obj_x[so_ctr]+48)
+                  {
+                    get_obj=TRUE;
+                    get_oid=-1;
+                    if (gs->player_y+48<gs->s_obj_y[so_ctr] || gs->player_y+48>(gs->s_obj_y[so_ctr]+48))
+                    {
+                      get_obj=FALSE;
+                    };
+                    if ((-gs->bgscroll_x+gs->player_x)<gs->s_obj_x[so_ctr] || (-gs->bgscroll_x+gs->player_x)>gs->s_obj_x[so_ctr]+48)
+                    {
+                      get_obj=FALSE;
+                    };
+                    if (!get_obj)
+                    {
+                      gs->walkto_x=(ms.pos.x-24)/WALK_SPEED*WALK_SPEED;
+                      gs->walkto_y=(ms.pos.y-24)/WALK_SPEED*WALK_SPEED;
+                      get_oid=so_ctr;
+                    }
+                    else { gs->s_obj_sid[so_ctr]=-1; };
+                  };
+                };
+              };
+            };
+            so_ctr++;
+          };
+
+        };
+
       }
       else
       {
@@ -368,6 +454,32 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
       // Draw Walking BoundingBox
       dc->color=GREEN;
       GrRect(dc,gs->player_x+16,gs->player_y+132,40,16);
+    };
+
+
+    i_desc[0]=0;
+    // Draw Scene Objects
+    so_ctr=0;
+    while (so_ctr<S_MAX_OBJ)
+    {
+      if (gs->s_obj_uid[so_ctr]>0)
+      {
+        if (gs->s_obj_sid[so_ctr]==gs->scene_id)
+        {
+          SceneObjBlot(dc,gs->bgscroll_x+gs->s_obj_x[so_ctr],gs->s_obj_y[so_ctr],so_col[gs->s_obj_uid[so_ctr]],so_row[gs->s_obj_uid[so_ctr]]);
+          if (left_action==ACT_PICK_UP)
+          {
+            if (ms.pos.y>gs->s_obj_y[so_ctr] && ms.pos.y<(gs->s_obj_y[so_ctr]+48))
+            {
+              if ((-gs->bgscroll_x+ms.pos.x)>gs->s_obj_x[so_ctr] && (-gs->bgscroll_x+ms.pos.x)<gs->s_obj_x[so_ctr]+48)
+              {
+                StrCpy(i_desc,so_desc+(gs->s_obj_uid[so_ctr]*SO_MAX_DESC));
+              };
+            };
+          };
+        };
+      };
+      so_ctr++;
     };
   
     // HUD
@@ -524,7 +636,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     };
     GrPrint(dc,24,88,"읕컴컴컴컴컴컴컴컴컴컴켸");
 
-    GrPrint(dc,30,8," Terry's Temple Quest");    
+    GrPrint(dc,30,8,i_desc);    
 
     GrPrint(dc,24+(8*1),32+(8*1), "S");
     GrPrint(dc,24+(8*1),32+(8*2), "h");
@@ -610,6 +722,21 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
         gs->walkto_x=gs->player_x;
         gs->walkto_y=gs->player_y;  
       };
+    }
+    else
+    {
+      if (left_action==ACT_PICK_UP && get_oid!=-1)
+      {
+        get_obj=TRUE;
+        if (gs->player_y+48<gs->s_obj_y[get_oid] || gs->player_y+48>(gs->s_obj_y[get_oid]+48))
+        {
+          if ((-gs->bgscroll_x+gs->player_x)<gs->s_obj_x[get_oid] || (-gs->bgscroll_x+gs->player_x)>gs->s_obj_x[get_oid]+48)
+          {
+            get_obj=FALSE;
+          };
+        };
+        if (get_obj) { gs->s_obj_sid[get_oid]=-1; get_oid=-1; };
+      };
     };
 
     if (gs->walk_fseq>3) { gs->walk_fdir=1; };
@@ -624,6 +751,9 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   SaveGameState("GAME.STATE.Z",gs);
   Free(gs);
 
+  Free(so_col);
+  Free(so_row);
+  Free(so_desc);
   ScenesDel(scenes);
   Fs->draw_it=0;
   FreeFont(font_berk);
