@@ -1,5 +1,6 @@
 
 CDC *s_Objects=GRRead("Chars/Objects.CHAR.GR");
+CDC *s_Targets=GRRead("Chars/Targets.CHAR.GR");
 CDC *s_Terry=GRRead("Chars/Terry.CHAR.GR");
 CDC *th_Dianna=GRRead("Chars/DiannaT.CHAR.GR");
 
@@ -7,7 +8,8 @@ U0 FreeChars()
 {
   DCDel(th_Dianna);
   DCDel(s_Terry);
-  DCDel(s_Objects);
+  DCDel(s_Targets);
+  DCDel(s_Objects);
 }
 
 U0 SceneObjBlot(CDC *dc, I64 dc_x, I64 dc_y, I64 gr48_x, I64 gr48_y)
@@ -15,7 +17,7 @@ U0 SceneObjBlot(CDC *dc, I64 dc_x, I64 dc_y, I64 gr48_x, I64 gr48_y)
   CDC *GR48=DCNew(48,48);
   DCFill(GR48, TRANSPARENT);
   GrBlot(GR48, -(gr48_x*48), -(gr48_y*48), s_Objects);
-  GrBlot(dc, dc_x, dc_y, GR48);
+  GrBlot(dc, dc_x, dc_y, GR48);
   DCDel(GR48);
 }
 

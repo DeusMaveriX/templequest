@@ -24,6 +24,10 @@ class GameState {
   I64 s_obj_sid[S_MAX_OBJ];
   I64 s_obj_x[S_MAX_OBJ];
   I64 s_obj_y[S_MAX_OBJ];
+  I64 s_tgt_uid[S_MAX_OBJ];
+  I64 s_tgt_sid[S_MAX_OBJ];
+  I64 s_tgt_x[S_MAX_OBJ];
+  I64 s_tgt_y[S_MAX_OBJ];
 };
 
 class Scene {
@@ -131,6 +135,14 @@ U0 LoadGameState(GameState *gs, U8 *state_file)
     so_idx++; 
     gs->s_obj_y[so_ctr] = state_load[so_idx];
     so_idx++; 
+    gs->s_tgt_uid[so_ctr] = state_load[so_idx];
+    so_idx++; 
+    gs->s_tgt_sid[so_ctr] = state_load[so_idx];
+    so_idx++; 
+    gs->s_tgt_x[so_ctr] = state_load[so_idx];
+    so_idx++; 
+    gs->s_tgt_y[so_ctr] = state_load[so_idx];
+    so_idx++; 
     so_ctr++;
   };
   Free(state_load);
@@ -160,6 +172,14 @@ U0 SaveGameState(U8 *state_file, GameState *gs)
     save_state[so_idx]= gs->s_obj_x[so_ctr];
     so_idx++; 
     save_state[so_idx]= gs->s_obj_y[so_ctr];
+    so_idx++; 
+    save_state[so_idx]= gs->s_tgt_uid[so_ctr];
+    so_idx++; 
+    save_state[so_idx]= gs->s_tgt_sid[so_ctr];
+    so_idx++; 
+    save_state[so_idx]= gs->s_tgt_x[so_ctr];
+    so_idx++; 
+    save_state[so_idx]= gs->s_tgt_y[so_ctr];
     so_idx++; 
     so_ctr++;
   };
@@ -390,7 +410,14 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     gs->s_obj_x[8]=1032;
     gs->s_obj_y[8]=210;
 
+    // Test placement Scene Target (Garage)
+    gs->s_tgt_uid[3]=1;
+    gs->s_tgt_sid[3]=0;
+    gs->s_tgt_x[3]=454;
+    gs->s_tgt_y[3]=294;
+
   };
+
 
   #define ACT_WALK_TO	0x10
   #define ACT_PICK_UP	0x11
@@ -429,6 +456,13 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   I64 *so_col=CAlloc(sizeof(I64)*S_MAX_OBJ);
   I64 *so_row=CAlloc(sizeof(I64)*S_MAX_OBJ);
   U8 *so_desc=CAlloc(SO_MAX_DESC*S_MAX_OBJ);
+
+  I64 *st_width=CAlloc(sizeof(I64)*S_MAX_OBJ);
+  I64 *st_height=CAlloc(sizeof(I64)*S_MAX_OBJ);
+  I64 *st_charx=CAlloc(sizeof(I64)*S_MAX_OBJ);
+  I64 *st_chary=CAlloc(sizeof(I64)*S_MAX_OBJ);
+  U8 *st_desc=CAlloc(SO_MAX_DESC*S_MAX_OBJ);
+
   so_ctr=0;
   while (so_ctr<S_MAX_OBJ)
   {
@@ -436,8 +470,17 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     so_row[so_ctr]=0;
     so_ctr++;
   };
+  so_ctr=0;
+  while (so_ctr<S_MAX_OBJ)
+  {
+    st_width[so_ctr]=0;
+    st_height[so_ctr]=0;
+    st_charx[so_ctr]=0;
+    st_chary[so_ctr]=0;
+    so_ctr++;
+  };
 
-  #include "SceneObjects"
+  #include "SceneObjects"
   #include "SceneTargets"
     
   U8 f_charset[0x7F];
@@ -570,7 +613,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
           {
             left_action=ACT_WALK_TO;
           };
-          if (ms.pos.x>346 && ms.pos.x<431)
+          if (ms.pos.x>346 && ms.pos.x<431)
           {
             left_action=ACT_TALK_TO;
           };
@@ -620,8 +663,33 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     };
 
 
-    i_desc[0]=0;
+    // Draw Scene Targets (stub), todo: target bitmap overlays
     i_with[0]=0;
+    so_ctr=0;
+    while (so_ctr<S_MAX_OBJ)
+    {
+      if (gs->s_tgt_uid[so_ctr]>0)
+      {
+        if (gs->s_tgt_sid[so_ctr]==gs->scene_id)
+        {
+          // SceneObjBlot(dc,gs->bgscroll_x+gs->s_obj_x[so_ctr],gs->s_obj_y[so_ctr],so_col[gs->s_obj_uid[so_ctr]],so_row[gs->s_obj_uid[so_ctr]]);
+          if (left_action==ACT_USE)
+          {
+            if (ms.pos.y>gs->s_tgt_y[so_ctr] && ms.pos.y<gs->s_tgt_y[so_ctr]+st_height[gs->s_tgt_uid[so_ctr]])
+            {
+              if ((-gs->bgscroll_x+ms.pos.x)>gs->s_tgt_x[so_ctr] && (-gs->bgscroll_x+ms.pos.x)<gs->s_tgt_x[so_ctr]+st_width[gs->s_tgt_uid[so_ctr]])
+              {
+                StrCpy(i_with,"With ");
+                StrCpy(i_with+5,st_desc+(gs->s_tgt_uid[so_ctr]*SO_MAX_DESC));
+              };
+            };
+          };
+        };
+      };
+      so_ctr++;
+    };
+
+    i_desc[0]=0;
     // Draw Scene Objects
     so_ctr=0;
     while (so_ctr<S_MAX_OBJ)
@@ -673,7 +741,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     {
       StrCpy(i_desc,"Use ");
       StrCpy(i_desc+4,so_desc+(gs->s_obj_uid[i_use]*SO_MAX_DESC));
-      StrCpy(i_with,"With");
+
       h_tc=YELLOW;
       FontText(dc,font_berk,"Use",224+8,70,h_tc);
     }
@@ -944,6 +1012,11 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   SaveGameState("GAME.STATE.Z",gs);
   Free(gs);
 
+  Free(st_chary);
+  Free(st_charx);
+  Free(st_height);
+  Free(st_width);
+  Free(st_desc);
   Free(so_col);
   Free(so_row);
   Free(so_desc);
