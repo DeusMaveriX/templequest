@@ -9,6 +9,21 @@
                  prior to trigger SceneScript
   */
 
+U0 SceneScript(I64 script, GameState *gs)
+{
+  switch (script)
+  {
+    case 0x01:
 
+      // Test script placement Scene Object (nuggies)
+      gs->s_obj_uid[20]=5;
+      gs->s_obj_sid[20]=0;
+      gs->s_obj_x[20]=451;
+      gs->s_obj_y[20]=312;
+      
+      break;
+    default:
+      break;
+  }
 
-
+};

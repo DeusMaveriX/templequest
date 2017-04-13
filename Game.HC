@@ -45,6 +45,8 @@ class Scene {
   U8 song[512];
 };
 
+#include "SceneScripts";
+
 CDC *dc=DCNew(640,480);
 
 Scene *SceneAdd(I64 init_x, I64 t_x, I64 t_y, U8 *loc, U8 *bg_file, Scene *sc_head)
@@ -495,9 +497,8 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     so_ctr++;
   };
 
-  #include "SceneObjects"
-  #include "SceneTargets"
-  #include "SceneScripts"
+  #include "SceneObjects";
+  #include "SceneTargets";
     
   U8 f_charset[0x7F];
 
@@ -658,7 +659,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
                       {
                         pop_up=PopUpOk(st_scr_msg+(gs->s_tgt_uid[so_ctr]*SO_MAX_DESC));
                         gs->s_obj_sid[i_use]=-2;
-                        //SceneScript(st_scr_id[so_ctr]);  
+                        SceneScript(st_scr_id[gs->s_tgt_uid[so_ctr]],gs);  
                       }
                       else {
                         pop_up=PopUpOk("You can't use that item here.");
@@ -1061,7 +1062,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
       //ACT_USE
       if (left_action==ACT_USE && use_tid!=-1)
       {
-
+
         use_obj=TRUE;
         if (gs->player_y+st_height[gs->s_tgt_uid[use_tid]]<gs->s_obj_y[use_tid] || gs->player_y+st_height[gs->s_tgt_uid[use_tid]]>(gs->s_obj_y[use_tid]+st_height[gs->s_tgt_uid[use_tid]]))
         {
@@ -1076,7 +1077,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
           {
             pop_up=PopUpOk(st_scr_msg+(gs->s_tgt_uid[use_tid]*SO_MAX_DESC));
             gs->s_obj_sid[i_use]=-2;
-            //SceneScript(st_scr_id[so_ctr]);  
+            SceneScript(st_scr_id[gs->s_tgt_uid[use_tid]],gs);
           }
           else {
             pop_up=PopUpOk("You can't use that item here.");
