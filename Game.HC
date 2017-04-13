@@ -359,6 +359,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   WinMax;
   U8 i_desc[SO_MAX_DESC];
   U8 i_with[SO_MAX_DESC];
+  I64 pop_up;
   I64 so_ctr=0;
 
   GameState *gs=CAlloc(sizeof(GameState));
@@ -418,7 +419,6 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 
   };
 
-
   #define ACT_WALK_TO	0x10
   #define ACT_PICK_UP	0x11
   #define ACT_TALK_TO	0x12
@@ -448,6 +448,8 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   I64 scan_code=0;
   I64 scene_ctr=0;
   I64 snd_toggle=TRUE;
+  I64 use_obj=FALSE;
+  I64 use_tid=-1;
 
   CTask *SongTask=0;
   
@@ -461,7 +463,18 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   I64 *st_height=CAlloc(sizeof(I64)*S_MAX_OBJ);
   I64 *st_charx=CAlloc(sizeof(I64)*S_MAX_OBJ);
   I64 *st_chary=CAlloc(sizeof(I64)*S_MAX_OBJ);
+
+  /*
+     st_so_uid   uid of scene object to trigger SceneScript
+     st_scr_id   id of SceneScript
+     st_scr_msg  msg displayed when object used on target,
+                 prior to trigger SceneScript
+  */
+ 
+  I64 *st_so_uid=CAlloc(sizeof(I64)*S_MAX_OBJ); 
+  I64 *st_scr_id=CAlloc(sizeof(I64)*S_MAX_OBJ);
   U8 *st_desc=CAlloc(SO_MAX_DESC*S_MAX_OBJ);
+  U8 *st_scr_msg=CAlloc(SO_MAX_DESC*S_MAX_OBJ);
 
   so_ctr=0;
   while (so_ctr<S_MAX_OBJ)
@@ -477,11 +490,14 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     st_height[so_ctr]=0;
     st_charx[so_ctr]=0;
     st_chary[so_ctr]=0;
+    st_so_uid[so_ctr]=0;
+    st_scr_id[so_ctr]=0;
     so_ctr++;
   };
 
   #include "SceneObjects"
   #include "SceneTargets"
+  #include "SceneScripts"
     
   U8 f_charset[0x7F];
 
@@ -543,10 +559,10 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     };
 
     // Arrow keys move player
-    if (scan_code==0x4B) { get_oid=-1; gs->walkto_x= gs->player_x-WALK_SPEED*2; };
-    if (scan_code==0x4D) { get_oid=-1; gs->walkto_x= gs->player_x+WALK_SPEED*2; };
-    if (scan_code==0x48) { get_oid=-1; gs->walkto_y= gs->player_y-WALK_SPEED*2; };
-    if (scan_code==0x50) { get_oid=-1; gs->walkto_y= gs->player_y+WALK_SPEED*2; };
+    if (scan_code==0x4B) { get_oid=-1; use_tid=-1; gs->walkto_x= gs->player_x-WALK_SPEED*2; };
+    if (scan_code==0x4D) { get_oid=-1; use_tid=-1; gs->walkto_x= gs->player_x+WALK_SPEED*2; };
+    if (scan_code==0x48) { get_oid=-1; use_tid=-1; gs->walkto_y= gs->player_y-WALK_SPEED*2; };
+    if (scan_code==0x50) { get_oid=-1; use_tid=-1; gs->walkto_y= gs->player_y+WALK_SPEED*2; };
 
     msg_code=ScanMsg(,,1<<MSG_MS_L_UP+1<<MSG_MS_R_UP);
     if (msg_code==MSG_MS_R_UP)
@@ -604,6 +620,62 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 
         };
 
+        if (left_action==ACT_USE)
+        {
+
+          so_ctr=0;
+          while (so_ctr<S_MAX_OBJ)
+          {
+            if (gs->s_tgt_uid[so_ctr]>0)
+            {
+              if (gs->s_tgt_sid[so_ctr]==gs->scene_id)
+              {
+                if (ms.pos.y>gs->s_tgt_y[so_ctr] && ms.pos.y<gs->s_tgt_y[so_ctr]+st_height[gs->s_tgt_uid[so_ctr]])
+                {
+                  if ((-gs->bgscroll_x+ms.pos.x)>gs->s_tgt_x[so_ctr] && (-gs->bgscroll_x+ms.pos.x)<gs->s_tgt_x[so_ctr]+st_width[gs->s_tgt_uid[so_ctr]])
+                  {
+
+                    // walk to SceneTarget if needed, or Use SceneObject
+
+                    use_obj=TRUE;
+                    use_tid=-1;
+                    if (gs->player_y+st_height[gs->s_tgt_uid[so_ctr]]<gs->s_tgt_y[so_ctr] || gs->player_y+st_height[gs->s_tgt_uid[so_ctr]]>(gs->s_tgt_y[so_ctr]+st_height[gs->s_tgt_uid[so_ctr]]))
+                    {
+                      use_obj=FALSE;
+                    };
+                    if ((-gs->bgscroll_x+gs->player_x)<gs->s_tgt_x[so_ctr] || (-gs->bgscroll_x+gs->player_x)>gs->s_tgt_x[so_ctr]+st_width[gs->s_tgt_uid[so_ctr]])
+                    {
+                      use_obj=FALSE;
+                    };
+                    if (!use_obj)
+                    {
+                      gs->walkto_x=(ms.pos.x-24)/WALK_SPEED*WALK_SPEED;
+                      gs->walkto_y=(ms.pos.y-24)/WALK_SPEED*WALK_SPEED;
+                      use_tid=so_ctr;
+                    }
+                    else {
+                      if (gs->s_obj_uid[i_use]==st_so_uid[gs->s_tgt_uid[so_ctr]])
+                      {
+                        pop_up=PopUpOk(st_scr_msg+(gs->s_tgt_uid[so_ctr]*SO_MAX_DESC));
+                        gs->s_obj_sid[i_use]=-2;
+                        //SceneScript(st_scr_id[so_ctr]);  
+                      }
+                      else {
+                        pop_up=PopUpOk("You can't use that item here.");
+                      };
+                      left_action=ACT_WALK_TO;
+                      use_tid=-1;
+                    };
+
+                  };
+                };
+              };
+            };
+            so_ctr++;
+          };
+
+        };
+
       }
       else
       {
@@ -613,7 +685,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
           {
             left_action=ACT_WALK_TO;
           };
-          if (ms.pos.x>346 && ms.pos.x<431)
+          if (ms.pos.x>346 && ms.pos.x<431)
           {
             left_action=ACT_TALK_TO;
           };
@@ -985,6 +1057,35 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
         };
         if (get_obj) { gs->s_obj_sid[get_oid]=-1; get_oid=-1; };
       };
+
+      //ACT_USE
+      if (left_action==ACT_USE && use_tid!=-1)
+      {
+
+        use_obj=TRUE;
+        if (gs->player_y+st_height[gs->s_tgt_uid[use_tid]]<gs->s_obj_y[use_tid] || gs->player_y+st_height[gs->s_tgt_uid[use_tid]]>(gs->s_obj_y[use_tid]+st_height[gs->s_tgt_uid[use_tid]]))
+        {
+          if ((-gs->bgscroll_x+gs->player_x)<gs->s_obj_x[use_tid] || (-gs->bgscroll_x+gs->player_x)>gs->s_obj_x[use_tid]+st_height[gs->s_tgt_uid[use_tid]])
+          {
+            use_obj=FALSE;
+          };
+        };
+
+        if (use_obj) {
+          if (gs->s_obj_uid[i_use]==st_so_uid[gs->s_tgt_uid[use_tid]])
+          {
+            pop_up=PopUpOk(st_scr_msg+(gs->s_tgt_uid[use_tid]*SO_MAX_DESC));
+            gs->s_obj_sid[i_use]=-2;
+            //SceneScript(st_scr_id[so_ctr]);  
+          }
+          else {
+            pop_up=PopUpOk("You can't use that item here.");
+          };
+        };
+        left_action=ACT_WALK_TO;
+        use_tid=-1;
+     };
+
     };
 
     if (left_action==ACT_INVENTORY)
@@ -1012,6 +1113,9 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   SaveGameState("GAME.STATE.Z",gs);
   Free(gs);
 
+  Free(st_scr_msg);
+  Free(st_scr_id);
+  Free(st_so_uid);
   Free(st_chary);
   Free(st_charx);
   Free(st_height);

@@ -1,7 +1,7 @@
 /*
   Scenes are defined here.
   A Scene is a backdrop with a mask.
-  Mask contains rects,
+  Mask contains rects,
     Bounds clipped at color < 1
     color == 1 : Terry can walk here
     color > 1  : scene transition
@@ -76,9 +76,10 @@ GrRect(m_ptr->mask,881,331,80,32);
 //m_ptr->mask->color=3;
 //GrRect(m_ptr->mask,1164,416,76,48);
 
-m_ptr->st_id[3]=1;
-m_ptr->st_bx[3]=0;
-m_ptr->st_nx[3]=80;
-m_ptr->st_ny[3]=290;
+m_ptr->st_id[2]=0;
+m_ptr->st_bx[2]=0;
+m_ptr->st_nx[2]=70;
+m_ptr->st_ny[2]=270;
 
 s_ptr=*scenes;
+
