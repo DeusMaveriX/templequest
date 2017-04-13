@@ -6,9 +6,9 @@
 //   obj_x
 //   obj_y
 
-#define I_MAX_ITEMS 16
+#define I_MAX_ITEMS 8
 #define S_MAX_OBJ   512
-#define SO_MAX_DESC 32
+#define SO_MAX_DESC 48
 
 class GameState {
   I64 scene_id;
@@ -173,7 +173,7 @@ U0 DrawIt(CTask *task,CDC *tdc)
   GrBlot(tdc,0,0,dc);
 }
 
-U0 InventoryView(CDC *dc, GameState *gs, GameFont *font_berk, U8 *so_desc, I64 *so_col, I64 *so_row)
+I64 InventoryView(CDC *dc, GameState *gs, GameFont *font_berk, U8 *so_desc, I64 *so_col, I64 *so_row)
 {
 
   #define INV_DROP	0x10
@@ -185,6 +185,7 @@ U0 InventoryView(CDC *dc, GameState *gs, GameFont *font_berk, U8 *so_desc, I64 *
   I64 i_item_x=0;
   I64 i_item_y=0;
   I64 i_tc=0;
+  I64 i_use=-1;
   I64 ms_sel_x=0;
   I64 ms_sel_y=0;
   I64 msg_code=0;
@@ -294,7 +295,12 @@ U0 InventoryView(CDC *dc, GameState *gs, GameFont *font_berk, U8 *so_desc, I64 *
                     {
                       gs->s_obj_sid[i_ctr]=gs->scene_id;
                       gs->s_obj_x[i_ctr]=-gs->bgscroll_x+gs->player_x;
-                      gs->s_obj_y[i_ctr]=gs->player_y+96;
+                      gs->s_obj_y[i_ctr]=gs->player_y+96;
+                      i_exit=TRUE;
+                    };
+                    if (i_act==INV_USE)
+                    {
+                      i_use=i_ctr;
                       i_exit=TRUE;
                     };
                   };
@@ -320,6 +326,7 @@ U0 InventoryView(CDC *dc, GameState *gs, GameFont *font_berk, U8 *so_desc, I64 *
 
     Sleep(1);
   };
+  return i_use;
 }
 
 U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
@@ -331,6 +338,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   WinBorder;
   WinMax;
   U8 i_desc[SO_MAX_DESC];
+  U8 i_with[SO_MAX_DESC];
   I64 so_ctr=0;
 
   GameState *gs=CAlloc(sizeof(GameState));
@@ -392,6 +400,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   #define ACT_CLOSE	0x15
   #define ACT_PUSH	0x16
   #define ACT_PULL	0x17
+  #define ACT_USE       0x18
 
   #define WALK_SPEED 2
 
@@ -402,6 +411,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   I64 get_obj=FALSE;
   I64 get_oid=-1;
   I64 h_tc=0;
+  I64 i_use=-1;
   I64 left_action=ACT_WALK_TO;
   I64 msg_code;
   I64 prev_bgx=0;
@@ -427,7 +437,8 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     so_ctr++;
   };
 
-  #include "SceneObjects"
+  #include "SceneObjects"
+  #include "SceneTargets"
     
   U8 f_charset[0x7F];
 
@@ -495,6 +506,10 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     if (scan_code==0x50) { get_oid=-1; gs->walkto_y= gs->player_y+WALK_SPEED*2; };
 
     msg_code=ScanMsg(,,1<<MSG_MS_L_UP+1<<MSG_MS_R_UP);
+    if (msg_code==MSG_MS_R_UP)
+    {
+      left_action=ACT_WALK_TO;
+    };
     if (msg_code==MSG_MS_L_UP)
     {
       if (ms.pos.y>103)
@@ -606,6 +621,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 
 
     i_desc[0]=0;
+    i_with[0]=0;
     // Draw Scene Objects
     so_ctr=0;
     while (so_ctr<S_MAX_OBJ)
@@ -621,7 +637,8 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
             {
               if ((-gs->bgscroll_x+ms.pos.x)>gs->s_obj_x[so_ctr] && (-gs->bgscroll_x+ms.pos.x)<gs->s_obj_x[so_ctr]+48)
               {
-                StrCpy(i_desc,so_desc+(gs->s_obj_uid[so_ctr]*SO_MAX_DESC));
+                StrCpy(i_desc,"Pick Up ");
+                StrCpy(i_desc+8,so_desc+(gs->s_obj_uid[so_ctr]*SO_MAX_DESC));
               };
             };
           };
@@ -652,22 +669,33 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     };
     FontText(dc,font_berk,"Walk To",224+8,48,h_tc);
 
-    if (left_action==ACT_PICK_UP)
+    if (left_action==ACT_USE)
     {
+      StrCpy(i_desc,"Use ");
+      StrCpy(i_desc+4,so_desc+(gs->s_obj_uid[i_use]*SO_MAX_DESC));
+      StrCpy(i_with,"With");
       h_tc=YELLOW;
+      FontText(dc,font_berk,"Use",224+8,70,h_tc);
     }
     else
     {
-      h_tc=WHITE;
-      if (ms.pos.y>80 && ms.pos.y<95)
+      if (left_action==ACT_PICK_UP)
       {
-        if (ms.pos.x>238 && ms.pos.x<321)
+        h_tc=YELLOW;
+      }
+      else
+      {
+        h_tc=WHITE;
+        if (ms.pos.y>80 && ms.pos.y<95)
         {
-          h_tc=LTGREEN;
+          if (ms.pos.x>238 && ms.pos.x<321)
+          {
+            h_tc=LTGREEN;
+          };
         };
       };
+      FontText(dc,font_berk,"Pick Up",224+8,70,h_tc);
     };
-    FontText(dc,font_berk,"Pick Up",224+8,70,h_tc);
 
     if (left_action==ACT_TALK_TO)
     {
@@ -774,16 +802,17 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     FontText(dc,font_berk,"Pull",548+8,70,h_tc);
 
     dc->color=YELLOW;
-    GrPrint(dc,8,16+(8*8),i_desc);    
+    GrPrint(dc,8,16+(8*7),i_desc);    
+    GrPrint(dc,8,16+(8*8),i_with);    
 
     dc->color=WHITE;
-    GrPrint(dc,8,16+(8*1), "S");
-    GrPrint(dc,8,16+(8*2), "h");
-    GrPrint(dc,8,16+(8*3), "a");
-    GrPrint(dc,8,16+(8*4), "s");
-    GrPrint(dc,8,16+(8*5), "t");
-    GrPrint(dc,8,16+(8*6), "a");
-    GR96Blot(dc,-8,-24,s_Terry,3,1,0);
+    GrPrint(dc,8,16+(8*1)-4, "S");
+    GrPrint(dc,8,16+(8*2)-4, "h");
+    GrPrint(dc,8,16+(8*3)-4, "a");
+    GrPrint(dc,8,16+(8*4)-4, "s");
+    GrPrint(dc,8,16+(8*5)-4, "t");
+    GrPrint(dc,8,16+(8*6)-4, "a");
+    GR96Blot(dc,-8,-28,s_Terry,3,1,0);
 
     StrCpy(Fs->task_title,s_ptr->loc);
     dc->color=LTCYAN;
@@ -798,11 +827,14 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 
 
     //Debug
-    GrPrint(dc,24+(8*6),32+(8*1),"ms.X1Y1: %d %d", -gs->bgscroll_x+ms.pos.x, ms.pos.y);
+    if (!bg_layer)
+    {
+      GrPrint(dc,24+(8*6),32+(8*1),"ms.X1Y1: %d %d", -gs->bgscroll_x+ms.pos.x, ms.pos.y);
 
-    GrPrint(dc,24+(8*8),32+(8*2),"BX: %d", gs->bgscroll_x);
-    GrPrint(dc,24+(8*8),32+(8*3),"X1 Y1: %d %d", -gs->bgscroll_x+gs->player_x+16, gs->player_y+132);
-    GrPrint(dc,24+(8*8),32+(8*4),"X2 Y2: %d %d", -gs->bgscroll_x+gs->player_x+16+39, gs->player_y+132+15);
+      GrPrint(dc,24+(8*8),32+(8*2),"BX: %d", gs->bgscroll_x);
+      GrPrint(dc,24+(8*8),32+(8*3),"X1 Y1: %d %d", -gs->bgscroll_x+gs->player_x+16, gs->player_y+132);
+      GrPrint(dc,24+(8*8),32+(8*4),"X2 Y2: %d %d", -gs->bgscroll_x+gs->player_x+16+39, gs->player_y+132+15);
+    };
 
     // Terry 
     GR96Blot(dc,gs->player_x,gs->player_y+52,s_Terry,gs->walk_fseq,0,gs->walk_dir);
@@ -889,8 +921,15 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 
     if (left_action==ACT_INVENTORY)
     {
-      InventoryView(dc,gs,font_berk,so_desc,so_col,so_row);
-      left_action=ACT_WALK_TO;
+      i_use=InventoryView(dc,gs,font_berk,so_desc,so_col,so_row);
+      if (i_use>-1)
+      {
+        left_action=ACT_USE;
+      }
+      else
+      {
+        left_action=ACT_WALK_TO;
+      };
     };
 
     if (gs->walk_fseq>3) { gs->walk_fdir=1; };
