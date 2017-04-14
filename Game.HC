@@ -9,6 +9,7 @@
 #define I_MAX_ITEMS 8
 #define S_MAX_OBJ   512
 #define SO_MAX_DESC 48
+#define SO_MAX_SMSG 256
 
 class GameState {
   I64 scene_id;
@@ -44,6 +45,9 @@ class Scene {
   CDC *mask;
   U8 song[512];
 };
+
+// for now. :/
+CDC *to_01=GRRead("Chars/GarageOpen.TGT.GR");
 
 #include "SceneScripts";
 
@@ -476,7 +480,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   I64 *st_so_uid=CAlloc(sizeof(I64)*S_MAX_OBJ); 
   I64 *st_scr_id=CAlloc(sizeof(I64)*S_MAX_OBJ);
   U8 *st_desc=CAlloc(SO_MAX_DESC*S_MAX_OBJ);
-  U8 *st_scr_msg=CAlloc(SO_MAX_DESC*S_MAX_OBJ);
+  U8 *st_scr_msg=CAlloc(SO_MAX_SMSG*S_MAX_OBJ);
 
   so_ctr=0;
   while (so_ctr<S_MAX_OBJ)
@@ -657,9 +661,9 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
                     else {
                       if (gs->s_obj_uid[i_use]==st_so_uid[gs->s_tgt_uid[so_ctr]])
                       {
-                        pop_up=PopUpOk(st_scr_msg+(gs->s_tgt_uid[so_ctr]*SO_MAX_DESC));
+                        pop_up=PopUpOk(st_scr_msg+(gs->s_tgt_uid[so_ctr]*SO_MAX_SMSG));
                         gs->s_obj_sid[i_use]=-2;
-                        SceneScript(st_scr_id[gs->s_tgt_uid[so_ctr]],gs);  
+                        SceneScript(st_scr_id[gs->s_tgt_uid[so_ctr]],gs,so_ctr);  
                       }
                       else {
                         pop_up=PopUpOk("You can't use that item here.");
@@ -735,8 +739,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
       GrRect(dc,gs->player_x+16,gs->player_y+132,40,16);
     };
 
-
-    // Draw Scene Targets (stub), todo: target bitmap overlays
+    // Draw Scene Targets
     i_with[0]=0;
     so_ctr=0;
     while (so_ctr<S_MAX_OBJ)
@@ -745,7 +748,10 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
       {
         if (gs->s_tgt_sid[so_ctr]==gs->scene_id)
         {
-          // SceneObjBlot(dc,gs->bgscroll_x+gs->s_obj_x[so_ctr],gs->s_obj_y[so_ctr],so_col[gs->s_obj_uid[so_ctr]],so_row[gs->s_obj_uid[so_ctr]]);
+          if (bg_layer)
+          {
+            TargetOverlay(dc,s_ptr->mask,gs->bgscroll_x,gs->s_tgt_uid[so_ctr]);
+          };
           if (left_action==ACT_USE)
           {
             if (ms.pos.y>gs->s_tgt_y[so_ctr] && ms.pos.y<gs->s_tgt_y[so_ctr]+st_height[gs->s_tgt_uid[so_ctr]])
@@ -947,13 +953,13 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     GrPrint(dc,8,16+(8*8),i_with);    
 
     dc->color=WHITE;
-    GrPrint(dc,8,16+(8*1)-4, "S");
-    GrPrint(dc,8,16+(8*2)-4, "h");
-    GrPrint(dc,8,16+(8*3)-4, "a");
-    GrPrint(dc,8,16+(8*4)-4, "s");
-    GrPrint(dc,8,16+(8*5)-4, "t");
-    GrPrint(dc,8,16+(8*6)-4, "a");
-    GR96Blot(dc,-8,-28,s_Terry,3,1,0);
+    //GrPrint(dc,8,16+(8*1)-4, "S");
+    //GrPrint(dc,8,16+(8*2)-4, "h");
+    //GrPrint(dc,8,16+(8*3)-4, "a");
+    //GrPrint(dc,8,16+(8*4)-4, "s");
+    //GrPrint(dc,8,16+(8*5)-4, "t");
+    //GrPrint(dc,8,16+(8*6)-4, "a");
+    GR96Blot(dc,-20,-28,s_Terry,3,1,0);
 
     StrCpy(Fs->task_title,s_ptr->loc);
     dc->color=LTCYAN;
@@ -982,7 +988,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     GR96Blot(dc,gs->player_x,gs->player_y,s_Terry,2,2,!gs->walk_dir);
 
     // Test Dianna Thumbnail Overlay
-    GrBlot(dc,0,360,th_Dianna);
+    //GrBlot(dc,0,360,th_Dianna);
 
     bnd_x1y1 = GrPeek(s_ptr->mask, -gs->bgscroll_x+gs->player_x+16, gs->player_y+132);
     bnd_x2y2 = GrPeek(s_ptr->mask, -gs->bgscroll_x+gs->player_x+16+39, gs->player_y+132+15);
@@ -1075,9 +1081,9 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
         if (use_obj) {
           if (gs->s_obj_uid[i_use]==st_so_uid[gs->s_tgt_uid[use_tid]])
           {
-            pop_up=PopUpOk(st_scr_msg+(gs->s_tgt_uid[use_tid]*SO_MAX_DESC));
+            pop_up=PopUpOk(st_scr_msg+(gs->s_tgt_uid[use_tid]*SO_MAX_SMSG));
             gs->s_obj_sid[i_use]=-2;
-            SceneScript(st_scr_id[gs->s_tgt_uid[use_tid]],gs);
+            SceneScript(st_scr_id[gs->s_tgt_uid[use_tid]],gs,use_tid);
           }
           else {
             pop_up=PopUpOk("You can't use that item here.");
@@ -1113,6 +1119,9 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 
   SaveGameState("GAME.STATE.Z",gs);
   Free(gs);
+
+  // ugly, get rid of this
+  DCDel(to_01);
 
   Free(st_scr_msg);
   Free(st_scr_id);
