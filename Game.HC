@@ -6,10 +6,25 @@
 //   obj_x
 //   obj_y
 
-#define I_MAX_ITEMS 8
-#define S_MAX_OBJ   512
-#define SO_MAX_DESC 48
-#define SO_MAX_SMSG 256
+#define I_MAX_ITEMS    8
+#define S_MAX_OBJ      512
+#define SO_MAX_DESC    48
+#define SO_MAX_SMSG    256
+
+#define ACT_WALK_TO    -10
+#define ACT_PICK_UP    -11
+#define ACT_TALK_TO    -12
+#define ACT_INVENTORY  -13
+#define ACT_OPEN       -14
+#define ACT_CLOSE      -15
+#define ACT_PUSH       -16
+#define ACT_PULL       -17
+#define ACT_USE        -18
+
+#define INV_DROP       -10
+#define INV_USE        -11
+
+#define WALK_SPEED     2
 
 class GameState {
   I64 scene_id;
@@ -43,13 +58,16 @@ class Scene {
   I64 st_ny[16];
   CDC *bg;
   CDC *mask;
+  CDC*path;
   U8 song[512];
 };
 
 // for now. :/
 CDC *to_01=GRRead("Chars/GarageOpen.TGT.GR");
 
-#include "SceneScripts";
+#include "InitSceneObjs"
+#include "InitSceneTgts"
+#include "SceneScripts"
 
 CDC *dc=DCNew(640,480);
 
@@ -72,7 +90,9 @@ Scene *SceneAdd(I64 init_x, I64 t_x, I64 t_y, U8 *loc, U8 *bg_file, Scene *sc_he
   StrCpy(sc_new->song,"R");
   sc_new->bg=GRRead(bg_file);
   sc_new->mask=DCNew(sc_new->bg->width,sc_new->bg->height);
+  sc_new->path=DCNew(sc_new->bg->width,sc_new->bg->height);
   DCFill(sc_new->mask,0);
+  DCFill(sc_new->path,0);
   sc_new->next=0;
   if (sc_head->next==0)
   { 
@@ -99,11 +119,13 @@ U0 ScenesDel(Scene *_lst)
   {
     tmps=_lst;
     DCDel(_lst->mask);
+    DCDel(_lst->path);
     DCDel(_lst->bg);
     Free(_lst);
     _lst=tmps->next;
   };
   DCDel(_lst->mask);
+  DCDel(_lst->path);
   DCDel(_lst->bg);
   Free(_lst);
 }
@@ -201,9 +223,6 @@ U0 DrawIt(CTask *task,CDC *tdc)
 
 I64 InventoryView(CDC *dc, GameState *gs, GameFont *font_berk, U8 *so_desc, I64 *so_col, I64 *so_row)
 {
-
-  #define INV_DROP	0x10
-  #define INV_USE	0x11
 
   Bool i_exit=FALSE;
   I64 i_act=INV_DROP;
@@ -391,51 +410,9 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
       gs->s_obj_y[so_ctr]=0;
       so_ctr++;
     };
-
-    // Test placement Scene Object (Gold key)
-    gs->s_obj_uid[2]=4;
-    gs->s_obj_sid[2]=0;
-    gs->s_obj_x[2]=311;
-    gs->s_obj_y[2]=412;
-
-
-    // Test placement Scene Object (Shasta bottle)
-    gs->s_obj_uid[5]=1;
-    gs->s_obj_sid[5]=2;
-    gs->s_obj_x[5]=1240;
-    gs->s_obj_y[5]=310;
-
-    // Test placement Scene Object (Beefaroni)
-    gs->s_obj_uid[7]=2;
-    gs->s_obj_sid[7]=2;
-    gs->s_obj_x[7]=902;
-    gs->s_obj_y[7]=370;
-
-    // Test placement Scene Object (Plate of Nuggies)
-    gs->s_obj_uid[8]=5;
-    gs->s_obj_sid[8]=2;
-    gs->s_obj_x[8]=1032;
-    gs->s_obj_y[8]=210;
-
-    // Test placement Scene Target (Garage)
-    gs->s_tgt_uid[3]=1;
-    gs->s_tgt_sid[3]=0;
-    gs->s_tgt_x[3]=454;
-    gs->s_tgt_y[3]=294;
-
+    InitSceneObjs(gs);
+    InitSceneTgts(gs);
   };
-
-  #define ACT_WALK_TO	0x10
-  #define ACT_PICK_UP	0x11
-  #define ACT_TALK_TO	0x12
-  #define ACT_INVENTORY	0x13
-  #define ACT_OPEN	0x14
-  #define ACT_CLOSE	0x15
-  #define ACT_PUSH	0x16
-  #define ACT_PULL	0x17
-  #define ACT_USE       0x18
-
-  #define WALK_SPEED 2
 
   Bool bg_layer=TRUE;
 
@@ -454,6 +431,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   I64 scan_code=0;
   I64 scene_ctr=0;
   I64 snd_toggle=TRUE;
+  I64 success=FALSE;
   I64 use_obj=FALSE;
   I64 use_tid=-1;
 
@@ -524,7 +502,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   if (snd_toggle) { SongTask=Spawn(&PlaySceneSong,s_ptr->song); }
 
   if (!load_state)
-  {
+  {
     gs->bgscroll_x=s_ptr->init_x;
   };
 
@@ -534,6 +512,8 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   {
     scan_code=InU8(0x60);
 
+    // clear target overlay paths
+    GrBlot(s_ptr->mask,0,0,s_ptr->path);
 
     if (scan_code==0x26)
     { 
@@ -625,7 +605,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 
         };
 
-        if (left_action==ACT_USE)
+        if (left_action!=ACT_WALK_TO && left_action!=ACT_PICK_UP)
         {
 
           so_ctr=0;
@@ -656,16 +636,35 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
                     {
                       gs->walkto_x=(ms.pos.x-24)/WALK_SPEED*WALK_SPEED;
                       gs->walkto_y=(ms.pos.y-24)/WALK_SPEED*WALK_SPEED;
-                      use_tid=so_ctr;
+                      if (left_action==ACT_USE)
+                      {
+                        use_tid=so_ctr;
+                      }
+                      else {
+                        use_tid=left_action;
+                      };
                     }
-                    else {
-                      if (gs->s_obj_uid[i_use]==st_so_uid[gs->s_tgt_uid[so_ctr]])
+                    else {                      
+                      GrPrint(dc,40,40,"top %d",st_so_uid[gs->s_tgt_uid[so_ctr]]);
+
+                      success=FALSE;
+                      if (left_action==ACT_USE && gs->s_obj_uid[i_use]==st_so_uid[gs->s_tgt_uid[so_ctr]])
                       {
                         pop_up=PopUpOk(st_scr_msg+(gs->s_tgt_uid[so_ctr]*SO_MAX_SMSG));
                         gs->s_obj_sid[i_use]=-2;
-                        SceneScript(st_scr_id[gs->s_tgt_uid[so_ctr]],gs,so_ctr);  
+                        SceneScript(st_scr_id[gs->s_tgt_uid[so_ctr]],gs,st_so_uid,st_scr_id,so_ctr);  
+                        success=TRUE;
                       }
                       else {
+                        if (left_action==st_so_uid[gs->s_tgt_uid[so_ctr]])
+                        {
+                          pop_up=PopUpOk(st_scr_msg+(gs->s_tgt_uid[so_ctr]*SO_MAX_SMSG));
+                          SceneScript(st_scr_id[gs->s_tgt_uid[so_ctr]],gs,st_so_uid,st_scr_id,so_ctr);  
+                          success=TRUE;
+                        };
+                      };
+                      if (!success)
+                      {
                         pop_up=PopUpOk("You can't use that item here.");
                       };
                       left_action=ACT_WALK_TO;
@@ -748,18 +747,21 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
       {
         if (gs->s_tgt_sid[so_ctr]==gs->scene_id)
         {
-          if (bg_layer)
-          {
-            TargetOverlay(dc,s_ptr->mask,gs->bgscroll_x,gs->s_tgt_uid[so_ctr]);
-          };
-          if (left_action==ACT_USE)
+          TargetOverlay(bg_layer,dc,s_ptr->mask,gs->bgscroll_x,gs->s_tgt_uid[so_ctr]);
+          if (left_action!=ACT_WALK_TO && left_action!=ACT_PICK_UP)
           {
             if (ms.pos.y>gs->s_tgt_y[so_ctr] && ms.pos.y<gs->s_tgt_y[so_ctr]+st_height[gs->s_tgt_uid[so_ctr]])
             {
               if ((-gs->bgscroll_x+ms.pos.x)>gs->s_tgt_x[so_ctr] && (-gs->bgscroll_x+ms.pos.x)<gs->s_tgt_x[so_ctr]+st_width[gs->s_tgt_uid[so_ctr]])
               {
-                StrCpy(i_with,"With ");
-                StrCpy(i_with+5,st_desc+(gs->s_tgt_uid[so_ctr]*SO_MAX_DESC));
+                if (left_action==ACT_USE)
+                {
+                  StrCpy(i_with,"With ");
+                  StrCpy(i_with+5,st_desc+(gs->s_tgt_uid[so_ctr]*SO_MAX_DESC));
+                }
+                else {
+                  StrCpy(i_with,st_desc+(gs->s_tgt_uid[so_ctr]*SO_MAX_DESC));         
+                };
               };
             };
           };
@@ -784,8 +786,9 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
             {
               if ((-gs->bgscroll_x+ms.pos.x)>gs->s_obj_x[so_ctr] && (-gs->bgscroll_x+ms.pos.x)<gs->s_obj_x[so_ctr]+48)
               {
-                StrCpy(i_desc,"Pick Up ");
-                StrCpy(i_desc+8,so_desc+(gs->s_obj_uid[so_ctr]*SO_MAX_DESC));
+                //StrCpy(i_desc,"Pick Up ");
+                //StrCpy(i_desc+8,so_desc+(gs->s_obj_uid[so_ctr]*SO_MAX_DESC));
+                StrCpy(i_with,so_desc+(gs->s_obj_uid[so_ctr]*SO_MAX_DESC));
               };
             };
           };
@@ -828,6 +831,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     {
       if (left_action==ACT_PICK_UP)
       {
+        StrCpy(i_desc,"Pick Up ");
         h_tc=YELLOW;
       }
       else
@@ -846,6 +850,8 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 
     if (left_action==ACT_TALK_TO)
     {
+      StrCpy(i_desc,"Talk To ");
+
       h_tc=YELLOW;
     }
     else
@@ -864,6 +870,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 
     if (left_action==ACT_INVENTORY)
     {
+
       h_tc=YELLOW;
     }
     else
@@ -882,6 +889,8 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 
     if (left_action==ACT_OPEN)
     {
+      StrCpy(i_desc,"Open ");
+
       h_tc=YELLOW;
     }
     else
@@ -899,6 +908,8 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 
     if (left_action==ACT_CLOSE)
     {
+      StrCpy(i_desc,"Close ");
+
       h_tc=YELLOW;
     }
     else
@@ -916,6 +927,8 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 
     if (left_action==ACT_PUSH)
     {
+      StrCpy(i_desc,"Push ");
+
       h_tc=YELLOW;
     }
     else
@@ -933,6 +946,8 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 
     if (left_action==ACT_PULL)
     {
+      StrCpy(i_desc,"Pull ");
+
       h_tc=YELLOW;
     }
     else
@@ -1066,7 +1081,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
       };
 
       //ACT_USE
-      if (left_action==ACT_USE && use_tid!=-1)
+      if (left_action!=ACT_WALK_TO && use_tid!=-1)
       {
 
         use_obj=TRUE;
@@ -1079,11 +1094,14 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
         };
 
         if (use_obj) {
+
+          GrPrint(dc,40,40,"bot %d",st_so_uid[gs->s_tgt_uid[use_tid]]);
+
           if (gs->s_obj_uid[i_use]==st_so_uid[gs->s_tgt_uid[use_tid]])
           {
             pop_up=PopUpOk(st_scr_msg+(gs->s_tgt_uid[use_tid]*SO_MAX_SMSG));
             gs->s_obj_sid[i_use]=-2;
-            SceneScript(st_scr_id[gs->s_tgt_uid[use_tid]],gs,use_tid);
+            SceneScript(st_scr_id[gs->s_tgt_uid[use_tid]],gs,st_so_uid,st_scr_id,use_tid);
           }
           else {
             pop_up=PopUpOk("You can't use that item here.");
@@ -1121,7 +1139,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   Free(gs);
 
   // ugly, get rid of this
-  DCDel(to_01);
+  DCDel(to_01);
 
   Free(st_scr_msg);
   Free(st_scr_id);
