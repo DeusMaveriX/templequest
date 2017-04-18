@@ -9,7 +9,7 @@ U0 FreeChars()
   DCDel(th_Dianna);
   DCDel(s_Terry);
   DCDel(s_Targets);
-  DCDel(s_Objects);
+  DCDel(s_Objects);
 }
 
 U0 SceneObjBlot(CDC *dc, I64 dc_x, I64 dc_y, I64 gr48_x, I64 gr48_y)
@@ -21,7 +21,7 @@ U0 SceneObjBlot(CDC *dc, I64 dc_x, I64 dc_y, I64 gr48_x, I64 gr48_y)
   DCDel(GR48);
 }
 
-U0 GR96Blot(CDC *dc, I64 dc_x, I64 dc_y, 
+U0 GR96Blot(CDC *dc, I64 dc_x, I64 dc_y, 
                CDC *GR, I64 gr96_x, I64 gr96_y, Bool r)
 {
   CDC *GR96=DCNew(96,96);

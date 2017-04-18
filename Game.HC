@@ -24,6 +24,8 @@
 #define INV_DROP       -10
 #define INV_USE        -11
 
+#define ST_Y_OFS       -48
+
 #define WALK_SPEED     2
 
 class GameState {
@@ -66,6 +68,7 @@ class Scene {
 
 // for now. :/
 CDC *to_01=GRRead("Chars/GarageOpen.TGT.GR");
+CDC *to_02=GRRead("Chars/KtchDoorOpen.TGT.GR");
 
 #include "InitSceneObjs"
 #include "InitSceneTgts"
@@ -632,7 +635,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 
                     use_obj=TRUE;
                     use_tid=-1;
-                    if (gs->player_y+st_height[gs->s_tgt_uid[so_ctr]]<gs->s_tgt_y[so_ctr] || gs->player_y+st_height[gs->s_tgt_uid[so_ctr]]>(gs->s_tgt_y[so_ctr]+st_height[gs->s_tgt_uid[so_ctr]]))
+                    if (gs->player_y+st_height[gs->s_tgt_uid[so_ctr]]<gs->s_tgt_y[so_ctr] || ST_Y_OFS+gs->player_y+st_height[gs->s_tgt_uid[so_ctr]]>(gs->s_tgt_y[so_ctr]+st_height[gs->s_tgt_uid[so_ctr]]))
                     {
                       use_obj=FALSE;
                     };
@@ -669,7 +672,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
                           SceneScript(gs->st_scr_id[gs->s_tgt_uid[so_ctr]],gs,so_ctr);  
                           success=TRUE;
                         };
-                      };
+                      };
                       if (!success)
                       {
                         pop_up=PopUpOk("You can't do that here.");
@@ -1074,7 +1077,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     }
     else
     {
-      if (left_action==ACT_PICK_UP && get_oid!=-1)
+      if (left_action==ACT_PICK_UP && get_oid!=-1)
       {
         get_obj=TRUE;
         if (gs->player_y+48<gs->s_obj_y[get_oid] || gs->player_y+48>(gs->s_obj_y[get_oid]+48))
@@ -1149,6 +1152,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   Free(gs);
 
   // ugly, get rid of this
+  DCDel(to_02);
   DCDel(to_01);
 
   Free(st_scr_msg);

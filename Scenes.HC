@@ -118,13 +118,31 @@ GrFloodFill(m_ptr->path,522,332,TRUE);
 m_ptr->path->color=2;
 GrRect(m_ptr->path,0,446,960,96);
 
-
-
 m_ptr->st_id[2]=0;
 m_ptr->st_bx[2]=-200;
 m_ptr->st_nx[2]=320;
 m_ptr->st_ny[2]=240;
 
+// test for open kitchen door
+m_ptr->st_id[6]=4;
+//m_ptr->st_bx[2]=-544;
+m_ptr->st_bx[6]=0;
+m_ptr->st_nx[6]=320;
+m_ptr->st_ny[6]=300;
+
+// 04
+m_ptr=SceneAdd(0,0, 300, "Terry's Giant Kitchen", "Scenes/07.SCENE.GR", scenes);
+//StrCpy(m_ptr->song, "2qGeEEs1B2E1B2EetCCRq1B2FCet1BAB2qGeEEs1B2E1B2EetCCRq1B2FCet1BAB2sDFDF1BBBBe2F1G2EDqE1AB2E2sDFDF1BBBBe2F1G2EDqE1AB2E");
+m_ptr->path->color=1;
+GrRect(m_ptr->path,0,430,960,96);
+
+m_ptr->path->color=2;
+GrRect(m_ptr->path,0,446,960,96);
+
+m_ptr->st_id[2]=3;
+m_ptr->st_bx[2]=-220;
+m_ptr->st_nx[2]=346;
+m_ptr->st_ny[2]=146;
+
 
 s_ptr=*scenes;
-
