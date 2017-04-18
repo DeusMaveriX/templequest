@@ -71,7 +71,7 @@ m_ptr->path->color=1;
 GrRect(m_ptr->path,0,436,m_ptr->path->width-1,62);
 GrLine(m_ptr->path,574,440,1143,312);
 GrLine(m_ptr->path,1061,335,1147,311);
-GrLine(m_ptr->path,1147,311,1299,310);
+GrLine(m_ptr->path,1147,311,1299,310);
 GrLine(m_ptr->path,1299,310,1589,440);
 GrFloodFill(m_ptr->path,1123,332,TRUE);
 
@@ -127,3 +127,4 @@ m_ptr->st_ny[2]=240;
 
 
 s_ptr=*scenes;
+

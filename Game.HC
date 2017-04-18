@@ -44,6 +44,8 @@ class GameState {
   I64 s_tgt_sid[S_MAX_OBJ];
   I64 s_tgt_x[S_MAX_OBJ];
   I64 s_tgt_y[S_MAX_OBJ];
+  I64 st_so_uid[S_MAX_OBJ];
+  I64 st_scr_id[S_MAX_OBJ];
 };
 
 class Scene {
@@ -171,6 +173,10 @@ U0 LoadGameState(GameState *gs, U8 *state_file)
     so_idx++; 
     gs->s_tgt_y[so_ctr] = state_load[so_idx];
     so_idx++; 
+    gs->st_so_uid[so_ctr] = state_load[so_idx];
+    so_idx++; 
+    gs->st_scr_id[so_ctr] = state_load[so_idx];
+    so_idx++; 
     so_ctr++;
   };
   Free(state_load);
@@ -208,6 +214,10 @@ U0 SaveGameState(U8 *state_file, GameState *gs)
     save_state[so_idx]= gs->s_tgt_x[so_ctr];
     so_idx++; 
     save_state[so_idx]= gs->s_tgt_y[so_ctr];
+    so_idx++; 
+    save_state[so_idx]= gs->st_so_uid[so_ctr];
+    so_idx++; 
+    save_state[so_idx]= gs->st_scr_id[so_ctr];
     so_idx++; 
     so_ctr++;
   };
@@ -408,6 +418,8 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
       gs->s_obj_sid[so_ctr]=0;
       gs->s_obj_x[so_ctr]=0;
       gs->s_obj_y[so_ctr]=0;
+      //gs->s_obj_y[so_ctr]=0;
+      //gs->s_obj_y[so_ctr]=0;
       so_ctr++;
     };
     InitSceneObjs(gs);
@@ -449,14 +461,12 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   I64 *st_chary=CAlloc(sizeof(I64)*S_MAX_OBJ);
 
   /*
-     st_so_uid   uid of scene object to trigger SceneScript
-     st_scr_id   id of SceneScript
+     gs->st_so_uid   uid of scene object to trigger SceneScript
+     gs->st_scr_id   id of SceneScript
      st_scr_msg  msg displayed when object used on target,
                  prior to trigger SceneScript
   */
  
-  I64 *st_so_uid=CAlloc(sizeof(I64)*S_MAX_OBJ); 
-  I64 *st_scr_id=CAlloc(sizeof(I64)*S_MAX_OBJ);
   U8 *st_desc=CAlloc(SO_MAX_DESC*S_MAX_OBJ);
   U8 *st_scr_msg=CAlloc(SO_MAX_SMSG*S_MAX_OBJ);
 
@@ -474,8 +484,6 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
     st_height[so_ctr]=0;
     st_charx[so_ctr]=0;
     st_chary[so_ctr]=0;
-    st_so_uid[so_ctr]=0;
-    st_scr_id[so_ctr]=0;
     so_ctr++;
   };
 
@@ -502,7 +510,7 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   if (snd_toggle) { SongTask=Spawn(&PlaySceneSong,s_ptr->song); }
 
   if (!load_state)
-  {
+  {
     gs->bgscroll_x=s_ptr->init_x;
   };
 
@@ -645,27 +653,26 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
                       };
                     }
                     else {                      
-                      GrPrint(dc,40,40,"top %d",st_so_uid[gs->s_tgt_uid[so_ctr]]);
+                      GrPrint(dc,40,40,"top %d",gs->st_so_uid[gs->s_tgt_uid[so_ctr]]);
 
                       success=FALSE;
-                      if (left_action==ACT_USE && gs->s_obj_uid[i_use]==st_so_uid[gs->s_tgt_uid[so_ctr]])
+                      if (left_action==ACT_USE && gs->s_obj_uid[i_use]==gs->st_so_uid[gs->s_tgt_uid[so_ctr]])
                       {
                         pop_up=PopUpOk(st_scr_msg+(gs->s_tgt_uid[so_ctr]*SO_MAX_SMSG));
                         gs->s_obj_sid[i_use]=-2;
-                        SceneScript(st_scr_id[gs->s_tgt_uid[so_ctr]],gs,st_so_uid,st_scr_id,so_ctr);  
+                        SceneScript(gs->st_scr_id[gs->s_tgt_uid[so_ctr]],gs,so_ctr);  
                         success=TRUE;
                       }
                       else {
-                        if (left_action==st_so_uid[gs->s_tgt_uid[so_ctr]])
+                        if (left_action==gs->st_so_uid[gs->s_tgt_uid[so_ctr]])
                         {
-                          pop_up=PopUpOk(st_scr_msg+(gs->s_tgt_uid[so_ctr]*SO_MAX_SMSG));
-                          SceneScript(st_scr_id[gs->s_tgt_uid[so_ctr]],gs,st_so_uid,st_scr_id,so_ctr);  
+                          SceneScript(gs->st_scr_id[gs->s_tgt_uid[so_ctr]],gs,so_ctr);  
                           success=TRUE;
                         };
-                      };
+                      };
                       if (!success)
                       {
-                        pop_up=PopUpOk("You can't use that item here.");
+                        pop_up=PopUpOk("You can't do that here.");
                       };
                       left_action=ACT_WALK_TO;
                       use_tid=-1;
@@ -1095,16 +1102,19 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
 
         if (use_obj) {
 
-          GrPrint(dc,40,40,"bot %d",st_so_uid[gs->s_tgt_uid[use_tid]]);
+          GrPrint(dc,40,40,"bot %d",gs->st_so_uid[gs->s_tgt_uid[use_tid]]);
 
-          if (gs->s_obj_uid[i_use]==st_so_uid[gs->s_tgt_uid[use_tid]])
+          if (gs->s_obj_uid[i_use]==gs->st_so_uid[gs->s_tgt_uid[use_tid]])
           {
-            pop_up=PopUpOk(st_scr_msg+(gs->s_tgt_uid[use_tid]*SO_MAX_SMSG));
+            if (left_action==ACT_USE)
+            {
+              pop_up=PopUpOk(st_scr_msg+(gs->s_tgt_uid[use_tid]*SO_MAX_SMSG));
+            };
             gs->s_obj_sid[i_use]=-2;
-            SceneScript(st_scr_id[gs->s_tgt_uid[use_tid]],gs,st_so_uid,st_scr_id,use_tid);
+            SceneScript(gs->st_scr_id[gs->s_tgt_uid[use_tid]],gs,use_tid);
           }
           else {
-            pop_up=PopUpOk("You can't use that item here.");
+            pop_up=PopUpOk("You can't do that here.");
           };
         };
         left_action=ACT_WALK_TO;
@@ -1142,8 +1152,6 @@ U0 Run(I64 sfx_cpu=0,Bool load_state=FALSE)
   DCDel(to_01);
 
   Free(st_scr_msg);
-  Free(st_scr_id);
-  Free(st_so_uid);
   Free(st_chary);
   Free(st_charx);
   Free(st_height);
